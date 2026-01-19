@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Phone, FileText, Pencil, Loader2 } from "lucide-react";
+import { Search, Plus, Phone, FileText, Pencil, Loader2, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function LeadsPage() {
@@ -33,6 +33,7 @@ export default function LeadsPage() {
       name: "",
       phone: "",
       city: "",
+      address: "", 
       capacity: "3",
       type: "Residential",
       status: "New"
@@ -56,7 +57,7 @@ export default function LeadsPage() {
     const { error } = await supabase.from('leads').insert([newLead]);
     if (!error) {
         setIsAddOpen(false);
-        setNewLead({ name: "", phone: "", city: "", capacity: "3", type: "Residential", status: "New" }); // Reset
+        setNewLead({ name: "", phone: "", city: "", address: "", capacity: "3", type: "Residential", status: "New" }); // Reset
         fetchLeads(); // Refresh
     } else {
         alert("Error adding lead: " + error.message);
@@ -71,6 +72,7 @@ export default function LeadsPage() {
       .update({ 
           name: editingLead.name, 
           city: editingLead.city, 
+          address: editingLead.address, 
           phone: editingLead.phone, 
           capacity: editingLead.capacity, 
           status: editingLead.status, 
@@ -88,10 +90,9 @@ export default function LeadsPage() {
   
   // 4. CONVERT TO PROJECT
   const handleConvertToProject = async (lead: any) => {
-    // A. Insert into Projects
     const { error } = await supabase.from('projects').insert({
         client_name: lead.name,
-        location: lead.city,
+        location: lead.address || lead.city, // Use full address if available
         capacity: Number(lead.capacity),
         type: lead.type,
         status: 'In Progress',
@@ -100,11 +101,8 @@ export default function LeadsPage() {
     });
 
     if (!error) {
-        // B. Update Lead Status
         await supabase.from('leads').update({ status: 'Won' }).eq('id', lead.id);
-        fetchLeads(); // Refresh list to show 'Won' status
-        
-        // C. Navigate to Projects
+        fetchLeads();
         if(confirm(`${lead.name} converted to Project! Go to Installations page?`)) {
             router.push("/installations");
         }
@@ -170,7 +168,10 @@ export default function LeadsPage() {
                             <TableRow key={lead.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                                 <TableCell className="font-medium">
                                     {lead.name}
-                                    <div className="text-xs text-slate-500">{lead.city}</div>
+                                    <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                                        <MapPin className="w-3 h-3"/> 
+                                        {lead.city} {lead.address ? `• ${lead.address}` : ""}
+                                    </div>
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className="mr-2">{lead.type}</Badge>
@@ -197,9 +198,10 @@ export default function LeadsPage() {
                                         <Pencil className="w-4 h-4 text-slate-500 hover:text-blue-600" />
                                     </Button>
 
+                                    {/* Quote Button with Address Passing */}
                                     <Link href={lead.type === "Industrial" 
-                                        ? `/documents/industrial-quote?client=${lead.name}&capacity=${lead.capacity}`
-                                        : `/documents/residential-quote?client=${lead.name}&capacity=${lead.capacity}`
+                                        ? `/documents/industrial-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
+                                        : `/documents/residential-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
                                     }>
                                         <Button size="sm" variant="outline" className="h-8 border-slate-300 text-slate-600">
                                             <FileText className="w-3 h-3 mr-2" /> Quote
@@ -215,7 +217,6 @@ export default function LeadsPage() {
                                             Convert
                                         </Button>
                                     )}
-
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -227,7 +228,6 @@ export default function LeadsPage() {
 
       {/* --- ADD LEAD DIALOG --- */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-         {/* Fixed: Updated sm:max-w-[500px] to sm:max-w-125 */}
          <DialogContent className="sm:max-w-125">
             <DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
@@ -244,6 +244,10 @@ export default function LeadsPage() {
                     <Input value={newLead.city} onChange={(e) => setNewLead({...newLead, city: e.target.value})} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">Address</Label>
+                    <Input placeholder="Full street address" value={newLead.address} onChange={(e) => setNewLead({...newLead, address: e.target.value})} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Capacity</Label>
                     <Input type="number" value={newLead.capacity} onChange={(e) => setNewLead({...newLead, capacity: e.target.value})} className="col-span-3" />
                 </div>
@@ -254,7 +258,7 @@ export default function LeadsPage() {
                         <SelectContent>
                             <SelectItem value="Residential">Residential</SelectItem>
                             <SelectItem value="Industrial">Industrial</SelectItem>
-                            <SelectItem value="Commercial">Commercial</SelectItem>
+                            {/* Removed Commercial */}
                         </SelectContent>
                     </Select>
                 </div>
@@ -267,7 +271,6 @@ export default function LeadsPage() {
 
       {/* --- EDIT LEAD DIALOG --- */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-         {/* Fixed: Updated sm:max-w-[500px] to sm:max-w-125 */}
          <DialogContent className="sm:max-w-125">
             <DialogHeader><DialogTitle>Edit Lead Details</DialogTitle></DialogHeader>
             {editingLead && (
@@ -283,6 +286,10 @@ export default function LeadsPage() {
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right">City</Label>
                         <Input value={editingLead.city} onChange={(e) => setEditingLead({...editingLead, city: e.target.value})} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Address</Label>
+                        <Input value={editingLead.address || ""} onChange={(e) => setEditingLead({...editingLead, address: e.target.value})} className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right">Capacity</Label>
@@ -307,7 +314,6 @@ export default function LeadsPage() {
             </DialogFooter>
          </DialogContent>
       </Dialog>
-
     </div>
   );
 }

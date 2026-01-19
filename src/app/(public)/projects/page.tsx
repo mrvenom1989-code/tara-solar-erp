@@ -11,13 +11,13 @@ import { Card, CardContent } from "@/components/ui/card";
 // ==========================================
 const PROJECTS = [
   // RESIDENTIAL
-  { id: 1, category: "residential", title: "Mehsana, Gujarat", capacity: "3.3 kW", image: "/images/res-1.jpg" },
+  { id: 1, category: "residential", title: "Mehsana, Gujarat", capacity: "5.5 kW", image: "/images/res-1.jpg" },
   { id: 2, category: "residential", title: "Jaska, Gujarat", capacity: "3.3 kW", image: "/images/res-2.jpg" },
-  { id: 3, category: "residential", title: "Satlasana, Gujarat", capacity: "3.3 kW", image: "/images/res-3.jpg" },
+  { id: 3, category: "residential", title: "Satlasana, Gujarat", capacity: "4.4 kW", image: "/images/res-3.jpg" },
   
   // COMMERCIAL / INDUSTRIAL
-  { id: 4, category: "commercial", title: "HYS Life Care", capacity: "600 kW", image: "/images/ind-1.jpg" },
-  { id: 5, category: "commercial", title: "HARA Poly pack", capacity: "990 kW", image: "/images/ind-2.jpg" },
+  { id: 4, category: "commercial", title: "HYS Life Care, Viramgam", capacity: "600 kW", image: "/images/ind-1.jpg" },
+  { id: 5, category: "commercial", title: "HARA Poly pack, Kadi", capacity: "990 kW", image: "/images/ind-2.jpg" },
   { id: 6, category: "commercial", title: "Sanand", capacity: "450 kW", image: "/images/ind-3.jpg" },
   
   // GROUND / FARMS

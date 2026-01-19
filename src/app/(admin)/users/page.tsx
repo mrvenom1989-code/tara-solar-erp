@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Shield, User, Loader2, Pencil, KeyRound } from "lucide-react";
-import { createNewUser, deleteUser, updateUser, resetUserPassword } from "@/app/actions/auth"; // Import Actions
+import { Plus, Trash2, User, Loader2, Pencil, KeyRound } from "lucide-react";
+import { createNewUser, deleteUser, updateUser, resetUserPassword } from "@/app/actions/auth"; 
 
 export default function UserManagementPage() {
   const supabase = createClient();
@@ -25,8 +25,8 @@ export default function UserManagementPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   
-  // Form Data
-  const [formData, setFormData] = useState({ id: 0, name: "", email: "", role: "Salesman", status: "Active", password: "" });
+  // Form Data - Default role updated to "Sales"
+  const [formData, setFormData] = useState({ id: 0, name: "", email: "", role: "Sales", status: "Active", password: "" });
 
   // 1. FETCH USERS
   const fetchUsers = async () => {
@@ -51,7 +51,7 @@ export default function UserManagementPage() {
     if(res.success) {
         setIsAddOpen(false);
         fetchUsers();
-        setFormData({ id: 0, name: "", email: "", role: "Salesman", status: "Active", password: "" });
+        setFormData({ id: 0, name: "", email: "", role: "Sales", status: "Active", password: "" });
     } else {
         alert(res.message);
     }
@@ -107,7 +107,7 @@ export default function UserManagementPage() {
         </div>
         
         <Button className="bg-[#65A30D] hover:bg-[#558b0b]" onClick={() => {
-            setFormData({ id: 0, name: "", email: "", role: "Salesman", status: "Active", password: "" });
+            setFormData({ id: 0, name: "", email: "", role: "Sales", status: "Active", password: "" });
             setIsAddOpen(true);
         }}>
             <Plus className="w-4 h-4 mr-2" /> Add Employee
@@ -185,8 +185,8 @@ export default function UserManagementPage() {
                         <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Salesman">Salesman</SelectItem>
-                            <SelectItem value="Installer">Installer</SelectItem>
+                            <SelectItem value="Sales">Sales</SelectItem>
+                            <SelectItem value="Office">Office</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -214,8 +214,8 @@ export default function UserManagementPage() {
                         <SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Salesman">Salesman</SelectItem>
-                            <SelectItem value="Installer">Installer</SelectItem>
+                            <SelectItem value="Sales">Sales</SelectItem>
+                            <SelectItem value="Office">Office</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

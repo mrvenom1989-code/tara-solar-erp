@@ -1,44 +1,82 @@
 // src/app/(admin)/documents/industrial-quote/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react"; 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Printer, Check, X, Save, Loader2, ArrowLeft } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch"; 
+import { Label } from "@/components/ui/label";
+import { Printer, Check, X, Save, Loader2, ArrowLeft, Settings2 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
 
-export default function IndustrialQuoteGenerator() {
+function QuoteContent() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   
   const [currentDate, setCurrentDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // 1. Initialize State
-  const [client, setClient] = useState("Chemtech Intermediated Pvt Ltd");
-  const [capacity, setCapacity] = useState("1000"); // KW
-  const [rate, setRate] = useState("31500"); // Per KW
+  // 1. INITIAL STATE (With Scope Matrix Defaults)
+  const [data, setData] = useState({
+    clientName: "Chemtech Intermediated Pvt Ltd",
+    address: "GIDC, Ankleshwar, Gujarat", 
+    capacity: "1000",
+    rate: "31500",
+    
+    // Configurable Scope Matrix
+    // true = Tara Scope (Green Check), false = Client Scope (Blue Check on right)
+    scope: [
+        { name: "Design & Engineering", isTara: true },
+        { name: "Supply of Major Materials", isTara: true },
+        { name: "Land Acquisition & Fencing", isTara: false }, 
+        { name: "Civil Foundations (Piling)", isTara: true },
+        { name: "Liaisoning (GETCO/DISCOM)", isTara: true },
+        { name: "Water & Construction Power", isTara: false }, 
+    ]
+  });
 
-  // 2. Hydration & URL Param Logic
+  // 2. HYDRATION & SNAPSHOT LOADING
   useEffect(() => {
     setCurrentDate(new Date().toLocaleDateString("en-IN"));
     
-    // Check URL parameters from Leads Page
-    const clientParam = searchParams.get("client");
-    const capacityParam = searchParams.get("capacity");
+    const loadData = async () => {
+        const quoteId = searchParams.get("id");
+        const clientParam = searchParams.get("client");
+        const capacityParam = searchParams.get("capacity");
 
-    if (clientParam) setClient(clientParam);
-    if (capacityParam) setCapacity(capacityParam);
+        if (quoteId) {
+            // A. VIEW MODE: Load Snapshot
+            const { data: quote, error } = await supabase
+                .from('quotations')
+                .select('*')
+                .eq('id', quoteId)
+                .single();
+            
+            if (quote && quote.data_snapshot) {
+                setData(quote.data_snapshot);
+            }
+        } else if (clientParam) {
+            // B. CREATE MODE: Load params
+            setData(prev => ({
+                ...prev,
+                clientName: clientParam,
+                capacity: capacityParam || prev.capacity
+            }));
+        }
+        setLoading(false);
+    };
     
+    loadData();
   }, [searchParams]);
 
-  // 3. Calculations
-  const totalVal = parseFloat(capacity) * parseFloat(rate);
+  // 3. CALCULATIONS
+  const totalVal = parseFloat(data.capacity) * parseFloat(data.rate);
 
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString("en-IN", {
@@ -47,14 +85,24 @@ export default function IndustrialQuoteGenerator() {
     });
   };
 
-  // 4. SAVE FUNCTION
+  // 4. HELPER: Toggle Scope
+  const toggleScope = (index: number) => {
+      const newScope = [...data.scope];
+      newScope[index].isTara = !newScope[index].isTara;
+      setData({ ...data, scope: newScope });
+  };
+
+  // 5. SAVE FUNCTION (With Snapshot)
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from('quotations').insert({
-        client_name: client,
+        client_name: data.clientName,
         type: 'Industrial',
         amount: `₹${formatCurrency(totalVal)}`,
-        status: 'Generated'
+        status: 'Generated',
+        capacity: data.capacity,
+        address: data.address, 
+        data_snapshot: data    
     });
 
     if (error) {
@@ -66,8 +114,10 @@ export default function IndustrialQuoteGenerator() {
     }
   };
 
+  if (loading) return <div className="flex justify-center h-screen items-center"><Loader2 className="animate-spin" /></div>;
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-20">
+    <div className="max-w-6xl mx-auto space-y-8 pb-20">
       
       {/* 🖨️ PRINT STYLE */}
       <style type="text/css" media="print">
@@ -81,35 +131,80 @@ export default function IndustrialQuoteGenerator() {
       `}
       </style>
 
-      {/* 1. CONTROLS (Hidden when printing) */}
-      <div className="print:hidden space-y-4">
-        <Link href="/documents" className="text-slate-500 hover:text-slate-900 flex items-center gap-2">
+      {/* 1. CONFIGURATION CARD (Hidden in Print) */}
+      <div className="print:hidden">
+        <Link href="/documents" className="text-slate-500 hover:text-slate-900 flex items-center gap-2 mb-4">
             <ArrowLeft className="w-4 h-4" /> Back to Documents
         </Link>
         
-        <Card>
-            <CardContent className="flex flex-col md:flex-row gap-4 p-6 items-end">
-                <div className="flex-1 w-full">
-                    <label className="text-xs font-bold">Client Name</label>
-                    <Input value={client} onChange={e => setClient(e.target.value)} />
+        <Card className="border-slate-200 shadow-md">
+            <CardHeader className="bg-slate-100 border-b flex flex-row items-center gap-2">
+                <Settings2 className="w-5 h-5 text-slate-500"/>
+                <CardTitle>Industrial Quote Configuration</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* Left: Basic Info */}
+                <div className="space-y-4">
+                    <h4 className="font-bold text-sm text-slate-500 uppercase border-b pb-2">Project Details</h4>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-xs font-bold block mb-1">Client Name</label>
+                            <Input value={data.clientName} onChange={e => setData({...data, clientName: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold block mb-1">Site Address</label>
+                            <Input value={data.address} onChange={e => setData({...data, address: e.target.value})} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold block mb-1">Capacity (KW)</label>
+                                <Input value={data.capacity} onChange={e => setData({...data, capacity: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold block mb-1 text-[#65A30D]">Rate/Watt (₹)</label>
+                                <Input value={data.rate} onChange={e => setData({...data, rate: e.target.value})} />
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="w-full md:w-32">
-                    <label className="text-xs font-bold">Capacity (KW)</label>
-                    <Input value={capacity} onChange={e => setCapacity(e.target.value)} />
+
+                {/* Right: Scope Matrix Config */}
+                <div className="space-y-4">
+                    <h4 className="font-bold text-sm text-slate-500 uppercase border-b pb-2">Scope of Work Matrix</h4>
+                    {/* Fixed Height & Class */}
+                    <div className="space-y-2 max-h-75 overflow-y-auto pr-2">
+                        {data.scope.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded border text-sm">
+                                <span>{item.name}</span>
+                                <div className="flex items-center gap-2">
+                                    <Label className={`text-xs ${!item.isTara ? 'font-bold text-blue-700' : 'text-slate-400'}`}>Client</Label>
+                                    <Switch 
+                                        checked={item.isTara}
+                                        onCheckedChange={() => toggleScope(index)}
+                                        className="data-[state=checked]:bg-[#65A30D]"
+                                    />
+                                    <Label className={`text-xs ${item.isTara ? 'font-bold text-[#65A30D]' : 'text-slate-400'}`}>Tara</Label>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-slate-400 text-center italic">Toggle switch to assign responsibility</p>
                 </div>
-                <div className="w-full md:w-32">
-                    <label className="text-xs font-bold">Rate/Watt (₹)</label>
-                    <Input value={rate} onChange={e => setRate(e.target.value)} />
-                </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                    <Button variant="outline" onClick={() => window.print()}>
+
+                {/* Bottom: Actions (Full Width) */}
+                <div className="md:col-span-2 pt-4 flex gap-3 border-t mt-2">
+                    <Button variant="outline" className="w-full md:w-auto ml-auto" onClick={() => window.print()}>
                         <Printer className="w-4 h-4 mr-2" /> Print
                     </Button>
-                    <Button className="bg-blue-900 hover:bg-blue-800" onClick={handleSave} disabled={saving}>
-                         {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                         Save
-                    </Button>
+                    {!searchParams.get('id') && (
+                        <Button className="w-full md:w-auto bg-blue-900 hover:bg-blue-800" onClick={handleSave} disabled={saving}>
+                            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                            Save Record
+                        </Button>
+                    )}
                 </div>
+
             </CardContent>
         </Card>
       </div>
@@ -132,15 +227,15 @@ export default function IndustrialQuoteGenerator() {
              <div className="my-12 text-center">
                  <div className="inline-block bg-blue-50 px-8 py-4 rounded-xl border border-blue-200">
                      <p className="text-sm text-slate-500 uppercase tracking-widest mb-2">Project Capacity</p>
-                     <span className="font-bold text-5xl text-blue-900">{capacity} KWp</span>
+                     <span className="font-bold text-5xl text-blue-900">{data.capacity} KWp</span>
                  </div>
              </div>
 
              <div className="grid grid-cols-2 gap-12 mb-20">
                  <div className="p-6 bg-slate-50 rounded-lg border-l-4 border-blue-900">
                      <p className="text-xs text-slate-500 uppercase font-bold mb-2">Prepared For</p>
-                     <h2 className="text-2xl font-bold text-slate-900">{client}</h2>
-                     <p>Gujarat, India</p>
+                     <h2 className="text-2xl font-bold text-slate-900">{data.clientName}</h2>
+                     <p>{data.address}</p>
                  </div>
                  <div className="p-6 bg-slate-50 rounded-lg border-l-4 border-[#65A30D]">
                      <p className="text-xs text-slate-500 uppercase font-bold mb-2">Submitted By</p>
@@ -161,10 +256,10 @@ export default function IndustrialQuoteGenerator() {
             <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">1. Project Technical Summary</h3>
             
             <div className="grid grid-cols-2 gap-y-2 gap-x-8 text-sm mb-8">
-                 <div className="flex justify-between border-b border-dashed py-2"><span>Plant Capacity (DC)</span><span className="font-bold">{capacity} KWp</span></div>
+                 <div className="flex justify-between border-b border-dashed py-2"><span>Plant Capacity (DC)</span><span className="font-bold">{data.capacity} KWp</span></div>
                  <div className="flex justify-between border-b border-dashed py-2"><span>Evacuation Voltage</span><span className="font-bold">11 KV</span></div>
                  <div className="flex justify-between border-b border-dashed py-2"><span>Module Type</span><span className="font-bold">N-Type Bi-Facial</span></div>
-                 <div className="flex justify-between border-b border-dashed py-2"><span>Generation (Year 1)</span><span className="font-bold">~16.5 Lakh Units</span></div>
+                 <div className="flex justify-between border-b border-dashed py-2"><span>Generation (Year 1)</span><span className="font-bold">~{parseFloat(data.capacity) * 1450 / 100000} Lakh Units</span></div>
             </div>
 
             <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">2. Technical Makes & Specs</h3>
@@ -196,12 +291,18 @@ export default function IndustrialQuoteGenerator() {
                     </tr>
                 </thead>
                 <tbody className="divide-y">
-                    <tr><td className="p-2">Design & Engineering</td><td className="p-2 text-center text-green-600"><Check className="inline w-4 h-4"/></td><td className="p-2 text-center text-slate-300"><X className="inline w-4 h-4"/></td></tr>
-                    <tr><td className="p-2">Supply of Major Materials</td><td className="p-2 text-center text-green-600"><Check className="inline w-4 h-4"/></td><td className="p-2 text-center text-slate-300"><X className="inline w-4 h-4"/></td></tr>
-                    <tr><td className="p-2">Land Acquisition & Fencing</td><td className="p-2 text-center text-slate-300"><X className="inline w-4 h-4"/></td><td className="p-2 text-center text-blue-600"><Check className="inline w-4 h-4"/></td></tr>
-                    <tr><td className="p-2">Civil Foundations (Piling)</td><td className="p-2 text-center text-green-600"><Check className="inline w-4 h-4"/></td><td className="p-2 text-center text-slate-300"><X className="inline w-4 h-4"/></td></tr>
-                    <tr><td className="p-2">Liaisoning (GETCO/DISCOM)</td><td className="p-2 text-center text-green-600"><Check className="inline w-4 h-4"/></td><td className="p-2 text-center text-slate-300"><X className="inline w-4 h-4"/></td></tr>
-                    <tr><td className="p-2">Water & Construction Power</td><td className="p-2 text-center text-slate-300"><X className="inline w-4 h-4"/></td><td className="p-2 text-center text-blue-600"><Check className="inline w-4 h-4"/></td></tr>
+                    {/* DYNAMIC SCOPE RENDERING */}
+                    {data.scope.map((item, i) => (
+                        <tr key={i}>
+                            <td className="p-2">{item.name}</td>
+                            <td className={`p-2 text-center ${item.isTara ? 'text-green-600' : 'text-slate-200'}`}>
+                                {item.isTara ? <Check className="inline w-4 h-4"/> : <X className="inline w-4 h-4"/>}
+                            </td>
+                            <td className={`p-2 text-center ${!item.isTara ? 'text-blue-600' : 'text-slate-200'}`}>
+                                {!item.isTara ? <Check className="inline w-4 h-4"/> : <X className="inline w-4 h-4"/>}
+                            </td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
         </div>
@@ -221,7 +322,7 @@ export default function IndustrialQuoteGenerator() {
                     <tbody>
                          <tr className="border-b">
                              <td className="p-4">
-                                 <strong>Turnkey EPC for {capacity} KWp Solar Power Plant</strong>
+                                 <strong>Turnkey EPC for {data.capacity} KWp Solar Power Plant</strong>
                                  <p className="text-xs text-slate-500 mt-1">Includes Design, Supply, Civil Work, Installation, Testing & Commissioning</p>
                              </td>
                              <td className="p-4 text-right text-lg font-bold">
@@ -273,5 +374,13 @@ export default function IndustrialQuoteGenerator() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function IndustrialQuoteGenerator() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center flex items-center justify-center h-screen"><Loader2 className="animate-spin w-6 h-6 mr-2" /> Loading Document...</div>}>
+      <QuoteContent />
+    </Suspense>
   );
 }

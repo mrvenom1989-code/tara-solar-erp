@@ -2,14 +2,14 @@
 import Image from "next/image";
 import { Navbar } from "@/components/marketing/Navbar";
 import { Footer } from "@/components/marketing/Footer";
-import { Users, Lightbulb, Leaf } from "lucide-react";
+import { Users, Lightbulb, Leaf, MapPin } from "lucide-react";
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans flex flex-col">
       <Navbar />
 
-      {/* HEADER - UPDATED: Matches Subsidy & Projects Page (Light Green Tint) */}
+      {/* HEADER */}
       <section className="bg-[#65A30D]/10 py-20 text-center border-b border-green-100 dark:border-green-900">
         <div className="container px-4 mx-auto">
           <h1 className="text-4xl font-bold text-slate-900 dark:text-white sm:text-5xl">About Tara Solar</h1>
@@ -47,30 +47,53 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 2. TEAM SECTION */}
+      {/* 2. WHERE INNOVATION HAPPENS (OFFICE & TEAM) */}
       <section className="py-20 bg-white dark:bg-slate-900">
         <div className="container px-4 mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-[#65A30D] mb-4">
-              <Users className="w-6 h-6" />
+              <MapPin className="w-6 h-6" />
             </div>
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">The Team</h2>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">Where Innovation Happens</h2>
             <p className="text-slate-600 dark:text-slate-300 text-lg">
-              Solar rooftop installation team @Tara Solar is united by a shared commitment to providing sustainable energy solutions, working collaboratively to ensure the highest standards of safety, efficiency, and quality in every project we complete. Together, we aim to make renewable energy accessible and impactful for every home and business.
+              Located in Satlasana, Gujarat, our headquarters is the hub of our operations.
             </p>
           </div>
 
-          {/* OFFICE GLIMPSE */}
-          <div className="relative h-100 rounded-2xl overflow-hidden shadow-xl border border-slate-100 dark:border-slate-800">
-            <Image 
-               src="/images/office.jpg" 
-               alt="Tara Solar Office" 
-               fill 
-               className="object-cover"
-             />
-             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                <h3 className="text-3xl font-bold text-white tracking-wide">Where Innovation Happens</h3>
-             </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* OFFICE PHOTO */}
+              <div className="relative h-100 rounded-2xl overflow-hidden shadow-xl border border-slate-100 dark:border-slate-800 group">
+                <Image 
+                   src="/images/office.jpg" 
+                   alt="Tara Solar Office" 
+                   fill 
+                   className="object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-8">
+                    <h3 className="text-2xl font-bold text-white">Our Headquarters</h3>
+                    <p className="text-white/80">Satlasana, Gujarat</p>
+                </div>
+              </div>
+
+              {/* TEAM PHOTO */}
+              <div className="relative h-100 rounded-2xl overflow-hidden shadow-xl border border-slate-100 dark:border-slate-800 group">
+                <Image 
+                   src="/images/team.jpg" 
+                   alt="Tara Solar Team" 
+                   fill 
+                   className="object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-8">
+                    <h3 className="text-2xl font-bold text-white">The Team</h3>
+                    <p className="text-white/80">United by a commitment to sustainability.</p>
+                </div>
+              </div>
+          </div>
+          
+          <div className="mt-12 text-center max-w-4xl mx-auto">
+             <p className="text-slate-600 dark:text-slate-300 text-lg italic">
+              "Solar rooftop installation team @Tara Solar is united by a shared commitment to providing sustainable energy solutions, working collaboratively to ensure the highest standards of safety, efficiency, and quality in every project we complete."
+             </p>
           </div>
         </div>
       </section>

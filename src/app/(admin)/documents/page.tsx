@@ -1,30 +1,74 @@
 // src/app/(admin)/documents/page.tsx
+"use client";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Factory, Home, Download, Plus, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Factory, Home, Download, Plus, Clock, Search, Loader2, Calendar, Filter } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/utils/supabase/server"; // Server Client
+import { createClient } from "@/utils/supabase/client"; 
 
-// Convert to Async Server Component
-export default async function DocumentsPage() {
-  const supabase = await createClient();
+export default function DocumentsPage() {
+  const supabase = createClient();
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Date Filter State
+  const [dateFilter, setDateFilter] = useState("all"); 
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
-  // 1. FETCH QUOTATIONS (Real Data)
-  const { data: quotes, error } = await supabase
-    .from('quotations')
-    .select('*')
-    .order('created_at', { ascending: false });
+  // 1. FETCH QUOTATIONS
+  const fetchQuotes = async () => {
+    setLoading(true);
+    
+    let query = supabase
+        .from('quotations')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  // Fallback if table doesn't exist yet
-  const recentQuotes = quotes || [];
+    const now = new Date();
+    
+    if (dateFilter === '30_days') {
+        const d = new Date(); 
+        d.setDate(d.getDate() - 30);
+        query = query.gte('created_at', d.toISOString());
+    } else if (dateFilter === 'this_year') {
+        const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString();
+        query = query.gte('created_at', startOfYear);
+    } else if (dateFilter === 'custom') {
+        if (customStart) query = query.gte('created_at', new Date(customStart).toISOString());
+        if (customEnd) {
+            const e = new Date(customEnd);
+            e.setHours(23, 59, 59, 999);
+            query = query.lte('created_at', e.toISOString());
+        }
+    }
+
+    const { data, error } = await query;
+    
+    if (data) setQuotes(data);
+    if (error) console.error("Error fetching quotes:", error);
+    setLoading(false);
+  };
+
+  // Trigger fetch when filters change
+  useEffect(() => {
+    if (dateFilter !== 'custom' || (customStart && customEnd)) {
+        fetchQuotes();
+    }
+  }, [dateFilter, customStart, customEnd]);
 
   return (
     <div className="space-y-8">
       
       {/* HEADER */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Quotations & Documents</h1>
             <p className="text-slate-500">Generate proposals and manage documentation history.</p>
@@ -76,15 +120,75 @@ export default async function DocumentsPage() {
 
       </div>
 
-      {/* 2. RECENT DOCUMENTS LIST */}
+      {/* 2. DOCUMENTS LIST WITH FILTER */}
       <Card>
-          <CardHeader>
-              <CardTitle>Recent Quotations</CardTitle>
+          <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <CardTitle>Quotations History</CardTitle>
+              
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                  {/* SEARCH */}
+                  <div className="relative w-full md:w-64">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <Input 
+                        placeholder="Search client name..." 
+                        className="pl-9" 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                  </div>
+
+                  {/* DATE FILTER GROUP */}
+                  <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-md border border-slate-200">
+                      <Select value={dateFilter} onValueChange={setDateFilter}>
+                          {/* Fixed Class Here: w-35 */}
+                          <SelectTrigger className="w-35 h-9 border-none shadow-none bg-transparent focus:ring-0">
+                              <div className="flex items-center gap-2 text-slate-600">
+                                  <Calendar className="w-4 h-4"/>
+                                  <SelectValue placeholder="Period" />
+                              </div>
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="all">All Time</SelectItem>
+                              <SelectItem value="30_days">Last 30 Days</SelectItem>
+                              <SelectItem value="this_year">This Year</SelectItem>
+                              <SelectItem value="custom">Custom Range</SelectItem>
+                          </SelectContent>
+                      </Select>
+
+                      {/* CUSTOM INPUTS (Visible only when custom selected) */}
+                      {dateFilter === 'custom' && (
+                          <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
+                              <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                              <Input 
+                                type="date" 
+                                className="h-7 w-fit text-xs px-2" 
+                                value={customStart} 
+                                onChange={(e) => setCustomStart(e.target.value)} 
+                              />
+                              <span className="text-xs text-slate-400">-</span>
+                              <Input 
+                                type="date" 
+                                className="h-7 w-fit text-xs px-2" 
+                                value={customEnd} 
+                                onChange={(e) => setCustomEnd(e.target.value)} 
+                              />
+                              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={fetchQuotes}>
+                                  <Filter className="w-3 h-3"/>
+                              </Button>
+                          </div>
+                      )}
+                  </div>
+              </div>
           </CardHeader>
+          
           <CardContent className="p-0">
-              {recentQuotes.length === 0 ? (
+              {loading ? (
+                  <div className="p-12 text-center text-slate-500 flex justify-center items-center gap-2">
+                     <Loader2 className="animate-spin h-5 w-5"/> Loading History...
+                  </div>
+              ) : quotes.length === 0 ? (
                   <div className="text-center py-12 text-slate-500 border-t">
-                      No quotations generated yet.
+                      No quotations found for this period.
                   </div>
               ) : (
                   <Table>
@@ -95,11 +199,11 @@ export default async function DocumentsPage() {
                               <TableHead>Type</TableHead>
                               <TableHead>Amount</TableHead>
                               <TableHead>Status</TableHead>
-                              <TableHead className="text-right">Download</TableHead>
+                              <TableHead className="text-right">Action</TableHead>
                           </TableRow>
                       </TableHeader>
                       <TableBody>
-                          {recentQuotes.map((quote: any) => (
+                          {quotes.filter(q => q.client_name?.toLowerCase().includes(searchTerm.toLowerCase())).map((quote: any) => (
                               <TableRow key={quote.id} className="hover:bg-slate-50">
                                   <TableCell className="text-slate-500 flex items-center gap-2">
                                       <Clock className="w-3 h-3" />
@@ -124,9 +228,15 @@ export default async function DocumentsPage() {
                                       </Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                      <Button size="sm" variant="ghost" className="text-slate-500 hover:text-slate-900">
-                                          <Download className="w-4 h-4 mr-2" /> PDF
-                                      </Button>
+                                      {/* LINK TO THE GENERATOR PAGE USING ID TO LOAD SNAPSHOT */}
+                                      <Link href={quote.type === 'Industrial' 
+                                          ? `/documents/industrial-quote?id=${quote.id}` 
+                                          : `/documents/residential-quote?id=${quote.id}`
+                                      }>
+                                          <Button size="sm" variant="outline" className="text-slate-600 border-slate-300">
+                                              <Download className="w-4 h-4 mr-2" /> View / PDF
+                                          </Button>
+                                      </Link>
                                   </TableCell>
                               </TableRow>
                           ))}
