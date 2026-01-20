@@ -7,10 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, Save, Loader2, ArrowLeft, Settings2 } from "lucide-react";
+import { Printer, Save, Loader2, ArrowLeft, Settings2, RefreshCcw } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
+
+// --- TYPES ---
+type BoMRow = {
+  sn: number;
+  description: string;
+  make: string;
+  qty: string;
+};
 
 function QuoteContent() {
   const supabase = createClient();
@@ -21,28 +29,68 @@ function QuoteContent() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 1. STATE: Full Control over the Quote
+  // 1. MASTER STATE (High Level Config)
   const [data, setData] = useState({
     clientName: "",
     phone: "",
     address: "",
     capacity: "3",       // kW
-    rate: "45000",       // Price per kW (Editable)
+    rate: "45000",       // Price per kW
     subsidy: "78000",    // Govt Subsidy
-    panelMake: "Waaree", // Brand Control
-    inverterMake: "Solis"// Brand Control
+    panelMake: "Waaree", 
+    panelSpec: "540Wp Mono-PERC", // NEW: Free text spec
+    inverterMake: "Solis",
+    inverterSpec: "Dual MPPT",    // NEW: Free text spec
   });
 
-  // 2. HYDRATION: Load from Saved Snapshot OR New Lead
+  // 2. DETAILED STATE (The BoM Grid)
+  const [bomRows, setBomRows] = useState<BoMRow[]>([
+    { sn: 1, description: "Solar PV Modules", make: "", qty: "" },
+    { sn: 2, description: "Solar Inverter (Grid Tie)", make: "", qty: "1 Set" },
+    { sn: 3, description: "Module Mounting Structure", make: "Hot Dip Galvanized (HDG)", qty: "Set" },
+    { sn: 4, description: "AC Distribution Box (ACDB)", make: "With MCB & SPD", qty: "1 No" },
+    { sn: 5, description: "DC Distribution Box (DCDB)", make: "With Fuse & SPD", qty: "1 No" },
+    { sn: 6, description: "DC Cable (Solar Grade)", make: "Polycab / RR (4 sq mm)", qty: "As Req." },
+    { sn: 7, description: "AC Cable", make: "Polycab / RR (Copper)", qty: "As Req." },
+    { sn: 8, description: "Earthing Kit", make: "Chemical Earthing (1.5m)", qty: "3 Sets" },
+    { sn: 9, description: "Lightning Arrestor (LA)", make: "Copper Bonded", qty: "1 No" },
+    { sn: 10, description: "Net Metering Liaisoning", make: "DISCOM Application", qty: "Included" },
+  ]);
+
+  // 3. AUTO-SYNC LOGIC (Updates BoM when Master Config changes)
+  useEffect(() => {
+    // Only update if data is loaded
+    if (loading) return;
+
+    setBomRows(prevRows => {
+      const newRows = [...prevRows];
+
+      // Update Panel Row (SN 1)
+      newRows[0].make = `${data.panelMake} (${data.panelSpec})`;
+      // Auto-calculate Qty: Capacity (kW) * 1000 / Panel Wattage (Estimate 540W if not specified)
+      // We parse the first number found in spec as wattage, fallback to 540
+      const wattageMatch = data.panelSpec.match(/(\d+)/);
+      const wattage = wattageMatch ? parseInt(wattageMatch[0]) : 540;
+      const panelQty = Math.ceil((parseFloat(data.capacity || "0") * 1000) / wattage);
+      newRows[0].qty = `${panelQty} Nos`;
+
+      // Update Inverter Row (SN 2)
+      newRows[1].make = `${data.inverterMake} ${data.inverterSpec}`;
+
+      return newRows;
+    });
+  }, [data.panelMake, data.panelSpec, data.inverterMake, data.inverterSpec, data.capacity, loading]);
+
+
+  // 4. LOAD DATA
   useEffect(() => {
     setCurrentDate(new Date().toLocaleDateString("en-IN"));
     
     const loadData = async () => {
-        const quoteId = searchParams.get("id"); // Viewing saved quote?
-        const clientParam = searchParams.get("client"); // New quote from lead?
+        const quoteId = searchParams.get("id");
+        const clientParam = searchParams.get("client");
         
         if (quoteId) {
-            // A. VIEW MODE: Fetch exact snapshot
             const { data: quote, error } = await supabase
                 .from('quotations')
                 .select('*')
@@ -50,13 +98,15 @@ function QuoteContent() {
                 .single();
             
             if (quote && quote.data_snapshot) {
-                // Restore the frozen state
                 setData(quote.data_snapshot);
+                // If the snapshot has saved BoM rows, load them too (Future proofing)
+                if(quote.data_snapshot.bomRows) {
+                    setBomRows(quote.data_snapshot.bomRows);
+                }
             } else if (error) {
                 console.error("Error loading quote:", error);
             }
         } else if (clientParam) {
-            // B. CREATE MODE: Pre-fill from URL params
             const capacityParam = searchParams.get("capacity") || "3";
             const addressParam = searchParams.get("address") || "";
             const phoneParam = searchParams.get("phone") || "";
@@ -75,7 +125,15 @@ function QuoteContent() {
     loadData();
   }, [searchParams]);
 
-  // 3. CALCULATIONS (Dynamic based on user input)
+  // 5. HELPER: Handle Table Edit
+  const handleBomChange = (index: number, field: keyof BoMRow, value: string) => {
+      const newRows = [...bomRows];
+      // @ts-ignore
+      newRows[index][field] = value;
+      setBomRows(newRows);
+  };
+
+  // 6. CALCULATIONS
   const totalCost = parseFloat(data.capacity) * parseFloat(data.rate);
   const netCost = totalCost - parseFloat(data.subsidy);
 
@@ -86,7 +144,7 @@ function QuoteContent() {
     });
   };
 
-  // 4. SAVE (SNAPSHOT)
+  // 7. SAVE
   const handleSave = async () => {
     setSaving(true);
 
@@ -95,10 +153,11 @@ function QuoteContent() {
         type: 'Residential',
         amount: `₹${formatCurrency(netCost)}`,
         status: 'Generated',
-        capacity: data.capacity, // Store separately for indexing
+        capacity: data.capacity,
         address: data.address,
         phone: data.phone,
-        data_snapshot: data // THE KEY FIX: Save full JSON state
+        // We save BOTH the master config AND the specific table rows
+        data_snapshot: { ...data, bomRows } 
     });
 
     if (error) {
@@ -124,6 +183,7 @@ function QuoteContent() {
         ::-webkit-scrollbar { display: none; }
         .break-before { page-break-before: always; }
         .break-inside-avoid { page-break-inside: avoid; }
+        input { border: none !important; padding: 0 !important; background: transparent !important; }
       `}
       </style>
 
@@ -171,30 +231,48 @@ function QuoteContent() {
                             <label className="text-xs font-bold text-[#65A30D]">Rate per kW (₹)</label>
                             <Input type="number" value={data.rate} onChange={(e) => setData({...data, rate: e.target.value})} />
                         </div>
-                        <div>
-                            <label className="text-xs font-bold">Panel Brand</label>
-                            <Select value={data.panelMake} onValueChange={(val) => setData({...data, panelMake: val})}>
-                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Waaree">Waaree</SelectItem>
-                                    <SelectItem value="Adani">Adani</SelectItem>
-                                    <SelectItem value="Goldi">Goldi</SelectItem>
-                                    <SelectItem value="Axitec">Axitec</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        
+                        {/* PANEL SECTION */}
+                        <div className="col-span-2 grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded">
+                            <div>
+                                <label className="text-xs font-bold">Panel Brand</label>
+                                <Select value={data.panelMake} onValueChange={(val) => setData({...data, panelMake: val})}>
+                                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Waaree">Waaree</SelectItem>
+                                        <SelectItem value="Adani">Adani</SelectItem>
+                                        <SelectItem value="Goldi">Goldi</SelectItem>
+                                        <SelectItem value="Axitec">Axitec</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold">Capacity/Spec (Free Text)</label>
+                                <Input className="h-9" value={data.panelSpec} onChange={(e) => setData({...data, panelSpec: e.target.value})} placeholder="e.g. 550W Bifacial" />
+                            </div>
                         </div>
-                        <div>
-                            <label className="text-xs font-bold">Inverter Brand</label>
-                            <Select value={data.inverterMake} onValueChange={(val) => setData({...data, inverterMake: val})}>
-                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Solis">Solis</SelectItem>
-                                    <SelectItem value="Growatt">Growatt</SelectItem>
-                                    <SelectItem value="Havells">Havells</SelectItem>
-                                    <SelectItem value="GoodWe">GoodWe</SelectItem>
-                                </SelectContent>
-                            </Select>
+
+                        {/* INVERTER SECTION */}
+                        <div className="col-span-2 grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded">
+                            <div>
+                                <label className="text-xs font-bold">Inverter Brand</label>
+                                <Select value={data.inverterMake} onValueChange={(val) => setData({...data, inverterMake: val})}>
+                                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Solis">Solis</SelectItem>
+                                        <SelectItem value="Growatt">Growatt</SelectItem>
+                                        <SelectItem value="Havells">Havells</SelectItem>
+                                        <SelectItem value="GoodWe">GoodWe</SelectItem>
+                                        <SelectItem value="Vsole">Vsole</SelectItem> {/* Added Vsole */}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold">Specification (Free Text)</label>
+                                <Input className="h-9" value={data.inverterSpec} onChange={(e) => setData({...data, inverterSpec: e.target.value})} placeholder="e.g. 10kW Dual MPPT" />
+                            </div>
                         </div>
+
                         <div className="col-span-2">
                             <label className="text-xs font-bold text-green-600">Subsidy Adjustment (₹)</label>
                             <Input type="number" value={data.subsidy} onChange={(e) => setData({...data, subsidy: e.target.value})} />
@@ -204,6 +282,9 @@ function QuoteContent() {
                 
                 {/* Footer Actions */}
                 <div className="md:col-span-4 pt-4 flex gap-3 justify-end border-t mt-2">
+                    <div className="text-xs text-slate-400 flex items-center mr-auto">
+                        <RefreshCcw className="w-3 h-3 mr-1"/> BoM updates automatically based on settings above. You can also edit the table below directly.
+                    </div>
                     <Button variant="outline" onClick={() => window.print()}>
                         <Printer className="w-4 h-4 mr-2" /> Print / PDF
                     </Button>
@@ -301,66 +382,35 @@ function QuoteContent() {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td className="p-3 text-center border">1</td>
-                            <td className="p-3 border font-medium">Solar PV Modules (Mono-PERC / TopCon)</td>
-                            <td className="p-3 border text-slate-600">{data.panelMake} (540Wp+)</td>
-                            <td className="p-3 text-center border">{Math.ceil(parseFloat(data.capacity)/0.540)} Nos</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">2</td>
-                            <td className="p-3 border font-medium">Solar Inverter (Grid Tie)</td>
-                            <td className="p-3 border text-slate-600">{data.inverterMake}</td>
-                            <td className="p-3 text-center border">1 Set</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">3</td>
-                            <td className="p-3 border">Module Mounting Structure</td>
-                            <td className="p-3 border text-slate-600">Hot Dip Galvanized (HDG)</td>
-                            <td className="p-3 text-center border">Set</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">4</td>
-                            <td className="p-3 border">AC Distribution Box (ACDB)</td>
-                            <td className="p-3 border text-slate-600">With MCB & SPD</td>
-                            <td className="p-3 text-center border">1 No</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">5</td>
-                            <td className="p-3 border">DC Distribution Box (DCDB)</td>
-                            <td className="p-3 border text-slate-600">With Fuse & SPD</td>
-                            <td className="p-3 text-center border">1 No</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">6</td>
-                            <td className="p-3 border">DC Cable (Solar Grade)</td>
-                            <td className="p-3 border text-slate-600">Polycab / RR (4 sq mm)</td>
-                            <td className="p-3 text-center border">As Req.</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">7</td>
-                            <td className="p-3 border">AC Cable</td>
-                            <td className="p-3 border text-slate-600">Polycab / RR (Copper)</td>
-                            <td className="p-3 text-center border">As Req.</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">8</td>
-                            <td className="p-3 border">Earthing Kit</td>
-                            <td className="p-3 border text-slate-600">Chemical Earthing (1.5m)</td>
-                            <td className="p-3 text-center border">3 Sets</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">9</td>
-                            <td className="p-3 border">Lightning Arrestor (LA)</td>
-                            <td className="p-3 border text-slate-600">Copper Bonded</td>
-                            <td className="p-3 text-center border">1 No</td>
-                        </tr>
-                        <tr>
-                            <td className="p-3 text-center border">10</td>
-                            <td className="p-3 border">Net Metering Liaisoning</td>
-                            <td className="p-3 border text-slate-600">DISCOM Application</td>
-                            <td className="p-3 text-center border">Included</td>
-                        </tr>
+                        {bomRows.map((row, index) => (
+                            <tr key={row.sn}>
+                                <td className="p-3 text-center border">{row.sn}</td>
+                                <td className="p-1 border">
+                                    {/* Editable Description */}
+                                    <input 
+                                        value={row.description}
+                                        onChange={(e) => handleBomChange(index, "description", e.target.value)}
+                                        className="w-full h-full bg-transparent p-2 focus:outline-none focus:bg-slate-50 font-medium"
+                                    />
+                                </td>
+                                <td className="p-1 border">
+                                    {/* Editable Make/Spec */}
+                                    <input 
+                                        value={row.make}
+                                        onChange={(e) => handleBomChange(index, "make", e.target.value)}
+                                        className="w-full h-full bg-transparent p-2 focus:outline-none focus:bg-slate-50 text-slate-600"
+                                    />
+                                </td>
+                                <td className="p-1 border text-center">
+                                    {/* Editable Qty */}
+                                    <input 
+                                        value={row.qty}
+                                        onChange={(e) => handleBomChange(index, "qty", e.target.value)}
+                                        className="w-full h-full bg-transparent p-2 text-center focus:outline-none focus:bg-slate-50"
+                                    />
+                                </td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
             </div>

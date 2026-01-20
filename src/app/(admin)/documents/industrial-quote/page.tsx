@@ -8,10 +8,23 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch"; 
 import { Label } from "@/components/ui/label";
-import { Printer, Check, X, Save, Loader2, ArrowLeft, Settings2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Printer, Check, X, Save, Loader2, ArrowLeft, Settings2, RefreshCcw } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import Link from "next/link";
+
+// --- TYPES ---
+type TechRow = {
+  component: string;
+  spec: string;
+  make: string;
+};
+
+type PaymentRow = {
+  percent: string;
+  stage: string;
+};
 
 function QuoteContent() {
   const supabase = createClient();
@@ -22,26 +35,83 @@ function QuoteContent() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 1. INITIAL STATE (With Scope Matrix Defaults)
+  // 1. MASTER CONFIGURATION STATE
   const [data, setData] = useState({
     clientName: "Chemtech Intermediated Pvt Ltd",
     address: "GIDC, Ankleshwar, Gujarat", 
     capacity: "1000",
     rate: "31500",
+    projectType: "Ground Mount", // "Ground Mount" | "Roof Mount"
     
-    // Configurable Scope Matrix
-    // true = Tara Scope (Green Check), false = Client Scope (Blue Check on right)
+    // Tech Config
+    panelMake: "Waaree",
+    panelSpec: "590Wp+ TopCon Bi-Facial",
+    inverterMake: "Sungrow",
+    inverterSpec: "String Inverters (Grid Tie)",
+    moduleTypeSummary: "N-Type Bi-Facial", // Project Summary Editable Field
+
+    // Configurable Scope Matrix (Renamed as requested)
     scope: [
         { name: "Design & Engineering", isTara: true },
-        { name: "Supply of Major Materials", isTara: true },
-        { name: "Land Acquisition & Fencing", isTara: false }, 
+        { name: "Land Acquisition", isTara: false }, // Renamed from Supply
+        { name: "Fencing", isTara: false },          // Renamed from Land & Fencing
         { name: "Civil Foundations (Piling)", isTara: true },
         { name: "Liaisoning (GETCO/DISCOM)", isTara: true },
         { name: "Water & Construction Power", isTara: false }, 
     ]
   });
 
-  // 2. HYDRATION & SNAPSHOT LOADING
+  // 2. DYNAMIC TABLE STATES
+  const [techRows, setTechRows] = useState<TechRow[]>([]);
+  
+  const [paymentSupply, setPaymentSupply] = useState<PaymentRow[]>([
+    { percent: "10%", stage: "Advance along with Work Order." },
+    { percent: "60%", stage: "Against Proforma Invoice (Before Dispatch)." },
+    { percent: "30%", stage: "Upon receipt of material at site (Prorata basis)." },
+  ]);
+
+  const [paymentService, setPaymentService] = useState<PaymentRow[]>([
+    { percent: "20%", stage: "Advance for Mobilization." },
+    { percent: "30%", stage: "On completion of Civil/Piling work." },
+    { percent: "30%", stage: "On completion of Structure & Module mounting." },
+    { percent: "10%", stage: "On Electrical Connectivity (Cabling/Inverter)." },
+    { percent: "10%", stage: "On successful Commissioning / Handover." },
+  ]);
+
+  // 3. SMART SYNC: Update Rows based on Project Type & Master Config
+  useEffect(() => {
+    if (loading) return;
+
+    // Define Base Rows
+    let rows: TechRow[] = [
+        { component: "Solar Modules", spec: data.panelSpec, make: data.panelMake },
+        { component: "Solar Inverter", spec: data.inverterSpec, make: data.inverterMake },
+        { component: "Module Mounting Structure", spec: "Hot Dip Galvanized (80 micron)", make: "Tara Solar Fab / Reputed" },
+        { component: "DC Cables", spec: "Solar Grade (4/6 sq mm)", make: "Polycab / RR / Apar" },
+        { component: "AC Cables", spec: "Alu. Armored (LT/HT)", make: "Polycab / RR / Apar" },
+        { component: "LT Panel / ACDB", spec: "Indoor/Outdoor Type", make: "Siemens / L&T / C&S" },
+        { component: "Earthing Kit", spec: "Chemical Earthing (3m)", make: "Reputed" },
+        { component: "Lightning Arrester", spec: "ESE Type (Copper)", make: "Reputed" },
+        { component: "SCADA", spec: "Remote Monitoring Hardware", make: "SolarLog / Meteocontrol / Inbuilt" },
+        { component: "Generation Meter", spec: "0.2s Class Accuracy", make: "Secure / L&T" },
+        { component: "Main Meter (Net Meter)", spec: "0.2s Class Accuracy (Bi-Dir)", make: "Secure / L&T" },
+    ];
+
+    // Add Ground Mount Specifics
+    if (data.projectType === "Ground Mount") {
+        rows.push(
+            { component: "Inverter Duty Transformer", spec: "Oil Cooled (ONAN)", make: "Voltamp / T&R / Reputed" },
+            { component: "Aux Transformer", spec: "Lighting/Aux Load", make: "Reputed" },
+            { component: "HT Panel (11/33kV)", spec: "VCB / SF6 Breaker", make: "Siemens / ABB / C&S" },
+            { component: "CCTV System", spec: "IP Cameras with NVR", make: "Hikvision / CP Plus" }
+        );
+    }
+
+    setTechRows(rows);
+  }, [data.projectType, data.panelMake, data.inverterMake, data.panelSpec, data.inverterSpec, loading]);
+
+
+  // 4. HYDRATION
   useEffect(() => {
     setCurrentDate(new Date().toLocaleDateString("en-IN"));
     
@@ -51,7 +121,6 @@ function QuoteContent() {
         const capacityParam = searchParams.get("capacity");
 
         if (quoteId) {
-            // A. VIEW MODE: Load Snapshot
             const { data: quote, error } = await supabase
                 .from('quotations')
                 .select('*')
@@ -59,10 +128,14 @@ function QuoteContent() {
                 .single();
             
             if (quote && quote.data_snapshot) {
-                setData(quote.data_snapshot);
+                const snap = quote.data_snapshot;
+                setData(snap);
+                // Restore arrays if they exist in snapshot
+                if(snap.techRows) setTechRows(snap.techRows);
+                if(snap.paymentSupply) setPaymentSupply(snap.paymentSupply);
+                if(snap.paymentService) setPaymentService(snap.paymentService);
             }
         } else if (clientParam) {
-            // B. CREATE MODE: Load params
             setData(prev => ({
                 ...prev,
                 clientName: clientParam,
@@ -75,24 +148,28 @@ function QuoteContent() {
     loadData();
   }, [searchParams]);
 
-  // 3. CALCULATIONS
+  // 5. HELPER FUNCTIONS
   const totalVal = parseFloat(data.capacity) * parseFloat(data.rate);
-
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString("en-IN", {
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
       minimumFractionDigits: 0,
     });
   };
 
-  // 4. HELPER: Toggle Scope
   const toggleScope = (index: number) => {
       const newScope = [...data.scope];
       newScope[index].isTara = !newScope[index].isTara;
       setData({ ...data, scope: newScope });
   };
 
-  // 5. SAVE FUNCTION (With Snapshot)
+  const handleTableEdit = (setter: any, rows: any[], index: number, field: string, value: string) => {
+      const newRows = [...rows];
+      newRows[index][field] = value;
+      setter(newRows);
+  }
+
+  // 6. SAVE
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from('quotations').insert({
@@ -102,7 +179,8 @@ function QuoteContent() {
         status: 'Generated',
         capacity: data.capacity,
         address: data.address, 
-        data_snapshot: data    
+        // Save Master + All Detail Arrays
+        data_snapshot: { ...data, techRows, paymentSupply, paymentService }    
     });
 
     if (error) {
@@ -117,7 +195,7 @@ function QuoteContent() {
   if (loading) return <div className="flex justify-center h-screen items-center"><Loader2 className="animate-spin" /></div>;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-20">
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
       
       {/* 🖨️ PRINT STYLE */}
       <style type="text/css" media="print">
@@ -128,10 +206,11 @@ function QuoteContent() {
         ::-webkit-scrollbar { display: none; }
         .break-before { page-break-before: always; }
         .break-inside-avoid { page-break-inside: avoid; }
+        input, textarea { border: none !important; padding: 0 !important; background: transparent !important; resize: none; }
       `}
       </style>
 
-      {/* 1. CONFIGURATION CARD (Hidden in Print) */}
+      {/* 1. CONFIGURATION CARD */}
       <div className="print:hidden">
         <Link href="/documents" className="text-slate-500 hover:text-slate-900 flex items-center gap-2 mb-4">
             <ArrowLeft className="w-4 h-4" /> Back to Documents
@@ -147,6 +226,19 @@ function QuoteContent() {
                 {/* Left: Basic Info */}
                 <div className="space-y-4">
                     <h4 className="font-bold text-sm text-slate-500 uppercase border-b pb-2">Project Details</h4>
+                    
+                    {/* Project Type Radio */}
+                    <div className="flex gap-4 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="pType" checked={data.projectType === 'Ground Mount'} onChange={() => setData({...data, projectType: 'Ground Mount'})} className="accent-blue-900 w-4 h-4" />
+                            <span className="text-sm font-bold text-blue-900">Ground Mount</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="pType" checked={data.projectType === 'Roof Mount'} onChange={() => setData({...data, projectType: 'Roof Mount'})} className="accent-blue-900 w-4 h-4" />
+                            <span className="text-sm font-bold text-blue-900">Roof Mount</span>
+                        </label>
+                    </div>
+
                     <div className="space-y-3">
                         <div>
                             <label className="text-xs font-bold block mb-1">Client Name</label>
@@ -162,8 +254,49 @@ function QuoteContent() {
                                 <Input value={data.capacity} onChange={e => setData({...data, capacity: e.target.value})} />
                             </div>
                             <div>
-                                <label className="text-xs font-bold block mb-1 text-[#65A30D]">Rate/Watt (₹)</label>
+                                <label className="text-xs font-bold block mb-1 text-[#65A30D]">Rate/KWatt (₹)</label>
                                 <Input value={data.rate} onChange={e => setData({...data, rate: e.target.value})} />
+                            </div>
+                        </div>
+                        
+                        {/* Modules Config */}
+                        <div className="bg-slate-50 p-3 rounded border">
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                                <div>
+                                    <label className="text-xs font-bold block mb-1">Module Make</label>
+                                    <Select value={data.panelMake} onValueChange={(val) => setData({...data, panelMake: val})}>
+                                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Waaree">Waaree</SelectItem>
+                                            <SelectItem value="Adani">Adani</SelectItem>
+                                            <SelectItem value="Goldi">Goldi</SelectItem>
+                                            <SelectItem value="Axitec">Axitec</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold block mb-1">Module Spec (Free Text)</label>
+                                    <Input className="h-8" value={data.panelSpec} onChange={e => setData({...data, panelSpec: e.target.value})} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-xs font-bold block mb-1">Inverter Make</label>
+                                    <Select value={data.inverterMake} onValueChange={(val) => setData({...data, inverterMake: val})}>
+                                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Sungrow">Sungrow</SelectItem>
+                                            <SelectItem value="Solis">Solis</SelectItem>
+                                            <SelectItem value="Growatt">Growatt</SelectItem>
+                                            <SelectItem value="GoodWe">GoodWe</SelectItem>
+                                            <SelectItem value="Vsole">Vsole</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold block mb-1">Inverter Spec (Free Text)</label>
+                                    <Input className="h-8" value={data.inverterSpec} onChange={e => setData({...data, inverterSpec: e.target.value})} />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -172,7 +305,6 @@ function QuoteContent() {
                 {/* Right: Scope Matrix Config */}
                 <div className="space-y-4">
                     <h4 className="font-bold text-sm text-slate-500 uppercase border-b pb-2">Scope of Work Matrix</h4>
-                    {/* Fixed Height & Class */}
                     <div className="space-y-2 max-h-75 overflow-y-auto pr-2">
                         {data.scope.map((item, index) => (
                             <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded border text-sm">
@@ -189,13 +321,18 @@ function QuoteContent() {
                             </div>
                         ))}
                     </div>
-                    <p className="text-xs text-slate-400 text-center italic">Toggle switch to assign responsibility</p>
+                    <div className="p-3 bg-yellow-50 text-xs text-yellow-800 rounded border border-yellow-100 flex gap-2">
+                        <RefreshCcw className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                            <strong>Note:</strong> The "Technical Makes & Specs" table below automatically updates based on "Project Type" and your Make selections. You can also edit table cells directly.
+                        </div>
+                    </div>
                 </div>
 
                 {/* Bottom: Actions (Full Width) */}
                 <div className="md:col-span-2 pt-4 flex gap-3 border-t mt-2">
                     <Button variant="outline" className="w-full md:w-auto ml-auto" onClick={() => window.print()}>
-                        <Printer className="w-4 h-4 mr-2" /> Print
+                        <Printer className="w-4 h-4 mr-2" /> Print / PDF
                     </Button>
                     {!searchParams.get('id') && (
                         <Button className="w-full md:w-auto bg-blue-900 hover:bg-blue-800" onClick={handleSave} disabled={saving}>
@@ -213,14 +350,14 @@ function QuoteContent() {
       <div className="bg-white p-12 border shadow-xl print:shadow-none print:border-none text-slate-800 font-sans" id="print-area">
         
         {/* --- COVER PAGE --- */}
-        <div className="min-h-225 flex flex-col justify-between">
+        <div className="min-h-[297mm] flex flex-col justify-between">
              <div className="flex items-center gap-4 border-b-4 border-blue-900 pb-6">
                 <div className="relative w-16 h-16">
                      <Image src="/logo.png" alt="Logo" width={64} height={64} className="object-contain" />
                 </div>
                 <div>
                      <h1 className="text-3xl font-bold text-blue-900 uppercase">Techno-Commercial Proposal</h1>
-                     <p className="text-lg text-slate-600">Grid Connected Ground Mount Solar Power Plant</p>
+                     <p className="text-lg text-slate-600">Grid Connected {data.projectType} Solar Power Plant</p>
                 </div>
              </div>
 
@@ -246,7 +383,7 @@ function QuoteContent() {
                  </div>
              </div>
              
-             <div className="text-center text-xs text-slate-400">
+             <div className="text-center text-xs text-slate-400 pb-8">
                  <p>Tara Solar Energy | Private & Confidential</p>
              </div>
         </div>
@@ -257,9 +394,15 @@ function QuoteContent() {
             
             <div className="grid grid-cols-2 gap-y-2 gap-x-8 text-sm mb-8">
                  <div className="flex justify-between border-b border-dashed py-2"><span>Plant Capacity (DC)</span><span className="font-bold">{data.capacity} KWp</span></div>
-                 <div className="flex justify-between border-b border-dashed py-2"><span>Evacuation Voltage</span><span className="font-bold">11 KV</span></div>
-                 <div className="flex justify-between border-b border-dashed py-2"><span>Module Type</span><span className="font-bold">N-Type Bi-Facial</span></div>
-                 <div className="flex justify-between border-b border-dashed py-2"><span>Generation (Year 1)</span><span className="font-bold">~{parseFloat(data.capacity) * 1450 / 100000} Lakh Units</span></div>
+                 {/* Removed Evacuation Voltage and Generation as requested */}
+                 <div className="flex justify-between border-b border-dashed py-2 items-center">
+                    <span>Module Type</span>
+                    <input 
+                        value={data.moduleTypeSummary} 
+                        onChange={e => setData({...data, moduleTypeSummary: e.target.value})}
+                        className="font-bold text-right w-1/2 focus:outline-none bg-transparent"
+                    />
+                 </div>
             </div>
 
             <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">2. Technical Makes & Specs</h3>
@@ -272,12 +415,31 @@ function QuoteContent() {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr className="border-b"><td className="p-2 font-bold">Solar Modules</td><td className="p-2">590Wp+ TopCon Bi-Facial Glass-Glass</td><td className="p-2">Waaree / Adani / Goldi</td></tr>
-                    <tr className="border-b"><td className="p-2 font-bold">Inverters</td><td className="p-2">String Inverters (Grid Tie)</td><td className="p-2">Sungrow / Solis / Goodwe</td></tr>
-                    <tr className="border-b"><td className="p-2 font-bold">Structure</td><td className="p-2">Hot Dip Galvanized (80 micron)</td><td className="p-2">Tara Solar Fab / Reputed</td></tr>
-                    <tr className="border-b"><td className="p-2 font-bold">AC/DC Cables</td><td className="p-2">Copper/Alu Armored</td><td className="p-2">Polycab / RR / Apar</td></tr>
-                    <tr className="border-b"><td className="p-2 font-bold">HT Panel</td><td className="p-2">11kV VCB Panel</td><td className="p-2">Siemens / L&T / C&S</td></tr>
-                    <tr className="border-b"><td className="p-2 font-bold">Transformer</td><td className="p-2">Inverter Duty Step-up</td><td className="p-2">Voltamp / T&R / Reputed</td></tr>
+                    {techRows.map((row, index) => (
+                        <tr key={index} className="border-b">
+                            <td className="p-2 font-bold">
+                                <input 
+                                    value={row.component} 
+                                    onChange={e => handleTableEdit(setTechRows, techRows, index, 'component', e.target.value)}
+                                    className="w-full bg-transparent focus:outline-none font-bold"
+                                />
+                            </td>
+                            <td className="p-2">
+                                <input 
+                                    value={row.spec} 
+                                    onChange={e => handleTableEdit(setTechRows, techRows, index, 'spec', e.target.value)}
+                                    className="w-full bg-transparent focus:outline-none"
+                                />
+                            </td>
+                            <td className="p-2">
+                                <input 
+                                    value={row.make} 
+                                    onChange={e => handleTableEdit(setTechRows, techRows, index, 'make', e.target.value)}
+                                    className="w-full bg-transparent focus:outline-none"
+                                />
+                            </td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
 
@@ -291,7 +453,6 @@ function QuoteContent() {
                     </tr>
                 </thead>
                 <tbody className="divide-y">
-                    {/* DYNAMIC SCOPE RENDERING */}
                     {data.scope.map((item, i) => (
                         <tr key={i}>
                             <td className="p-2">{item.name}</td>
@@ -340,22 +501,42 @@ function QuoteContent() {
             <div className="space-y-6 text-sm">
                 
                 <div>
-                    <h4 className="font-bold text-blue-900 border-b mb-2">A. Supply Portion (70% of Contract Value)</h4>
-                    <ul className="list-disc pl-5 space-y-1">
-                        <li><strong>10% Advance</strong> along with Work Order.</li>
-                        <li><strong>60% Payment</strong> against Proforma Invoice (Before Dispatch).</li>
-                        <li><strong>30% Payment</strong> upon receipt of material at site (Prorata basis).</li>
+                    <h4 className="font-bold text-blue-900 border-b mb-2">A. Supply Portion</h4>
+                    <ul className="pl-0 space-y-1">
+                        {paymentSupply.map((row, i) => (
+                            <li key={i} className="flex gap-2">
+                                <input 
+                                    className="font-bold w-12 text-right bg-transparent focus:outline-none" 
+                                    value={row.percent}
+                                    onChange={e => handleTableEdit(setPaymentSupply, paymentSupply, i, 'percent', e.target.value)}
+                                />
+                                <input 
+                                    className="flex-1 bg-transparent focus:outline-none" 
+                                    value={row.stage}
+                                    onChange={e => handleTableEdit(setPaymentSupply, paymentSupply, i, 'stage', e.target.value)}
+                                />
+                            </li>
+                        ))}
                     </ul>
                 </div>
 
                 <div>
-                    <h4 className="font-bold text-blue-900 border-b mb-2">B. Service & Erection Portion (30% of Contract Value)</h4>
-                    <ul className="list-disc pl-5 space-y-1">
-                        <li><strong>20% Advance</strong> for Mobilization.</li>
-                        <li><strong>30% Payment</strong> on completion of Civil/Piling work.</li>
-                        <li><strong>30% Payment</strong> on completion of Structure & Module mounting.</li>
-                        <li><strong>10% Payment</strong> on Electrical Connectivity (Cabling/Inverter).</li>
-                        <li><strong>10% Payment</strong> on successful Commissioning / Handover.</li>
+                    <h4 className="font-bold text-blue-900 border-b mb-2">B. Installation Services</h4>
+                    <ul className="pl-0 space-y-1">
+                        {paymentService.map((row, i) => (
+                            <li key={i} className="flex gap-2">
+                                <input 
+                                    className="font-bold w-12 text-right bg-transparent focus:outline-none" 
+                                    value={row.percent}
+                                    onChange={e => handleTableEdit(setPaymentService, paymentService, i, 'percent', e.target.value)}
+                                />
+                                <input 
+                                    className="flex-1 bg-transparent focus:outline-none" 
+                                    value={row.stage}
+                                    onChange={e => handleTableEdit(setPaymentService, paymentService, i, 'stage', e.target.value)}
+                                />
+                            </li>
+                        ))}
                     </ul>
                 </div>
 
