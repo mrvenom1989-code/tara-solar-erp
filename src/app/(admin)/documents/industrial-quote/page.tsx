@@ -41,20 +41,20 @@ function QuoteContent() {
     address: "GIDC, Ankleshwar, Gujarat", 
     capacity: "1000",
     rate: "31500",
-    projectType: "Ground Mount", // "Ground Mount" | "Roof Mount"
+    projectType: "Ground Mount",
     
     // Tech Config
     panelMake: "Waaree",
     panelSpec: "590Wp+ TopCon Bi-Facial",
     inverterMake: "Sungrow",
     inverterSpec: "String Inverters (Grid Tie)",
-    moduleTypeSummary: "N-Type Bi-Facial", // Project Summary Editable Field
+    moduleTypeSummary: "N-Type Bi-Facial", 
 
-    // Configurable Scope Matrix (Renamed as requested)
+    // Configurable Scope Matrix
     scope: [
         { name: "Design & Engineering", isTara: true },
-        { name: "Land Acquisition", isTara: false }, // Renamed from Supply
-        { name: "Fencing", isTara: false },          // Renamed from Land & Fencing
+        { name: "Land Acquisition", isTara: false }, 
+        { name: "Fencing", isTara: false },          
         { name: "Civil Foundations (Piling)", isTara: true },
         { name: "Liaisoning (GETCO/DISCOM)", isTara: true },
         { name: "Water & Construction Power", isTara: false }, 
@@ -78,11 +78,10 @@ function QuoteContent() {
     { percent: "10%", stage: "On successful Commissioning / Handover." },
   ]);
 
-  // 3. SMART SYNC: Update Rows based on Project Type & Master Config
+  // 3. SMART SYNC
   useEffect(() => {
     if (loading) return;
 
-    // Define Base Rows
     let rows: TechRow[] = [
         { component: "Solar Modules", spec: data.panelSpec, make: data.panelMake },
         { component: "Solar Inverter", spec: data.inverterSpec, make: data.inverterMake },
@@ -97,7 +96,6 @@ function QuoteContent() {
         { component: "Main Meter (Net Meter)", spec: "0.2s Class Accuracy (Bi-Dir)", make: "Secure / L&T" },
     ];
 
-    // Add Ground Mount Specifics
     if (data.projectType === "Ground Mount") {
         rows.push(
             { component: "Inverter Duty Transformer", spec: "Oil Cooled (ONAN)", make: "Voltamp / T&R / Reputed" },
@@ -130,7 +128,6 @@ function QuoteContent() {
             if (quote && quote.data_snapshot) {
                 const snap = quote.data_snapshot;
                 setData(snap);
-                // Restore arrays if they exist in snapshot
                 if(snap.techRows) setTechRows(snap.techRows);
                 if(snap.paymentSupply) setPaymentSupply(snap.paymentSupply);
                 if(snap.paymentService) setPaymentService(snap.paymentService);
@@ -169,7 +166,6 @@ function QuoteContent() {
       setter(newRows);
   }
 
-  // 6. SAVE
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from('quotations').insert({
@@ -179,7 +175,6 @@ function QuoteContent() {
         status: 'Generated',
         capacity: data.capacity,
         address: data.address, 
-        // Save Master + All Detail Arrays
         data_snapshot: { ...data, techRows, paymentSupply, paymentService }    
     });
 
@@ -197,15 +192,16 @@ function QuoteContent() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
       
-      {/* 🖨️ PRINT STYLE */}
+      {/* 🖨️ PRINT STYLE - OPTIMIZED FOR SPACING */}
       <style type="text/css" media="print">
       {`
         @page { size: A4; margin: 0mm; }
         body { visibility: hidden; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        #print-area { visibility: visible; position: absolute; top: 0; left: 0; width: 210mm; min-height: 297mm; background: white; color: black; margin: 0; padding: 15mm; }
+        #print-area { visibility: visible; position: absolute; top: 0; left: 0; width: 210mm; min-height: 297mm; background: white; color: black; margin: 0; padding: 10mm 15mm; }
         ::-webkit-scrollbar { display: none; }
         .break-before { page-break-before: always; }
         .break-inside-avoid { page-break-inside: avoid; }
+        tr, td, th, li { page-break-inside: avoid; } /* PREVENT ROW SPLITTING */
         input, textarea { border: none !important; padding: 0 !important; background: transparent !important; resize: none; }
       `}
       </style>
@@ -227,7 +223,6 @@ function QuoteContent() {
                 <div className="space-y-4">
                     <h4 className="font-bold text-sm text-slate-500 uppercase border-b pb-2">Project Details</h4>
                     
-                    {/* Project Type Radio */}
                     <div className="flex gap-4 p-2 bg-blue-50 rounded-lg border border-blue-100">
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="pType" checked={data.projectType === 'Ground Mount'} onChange={() => setData({...data, projectType: 'Ground Mount'})} className="accent-blue-900 w-4 h-4" />
@@ -259,7 +254,6 @@ function QuoteContent() {
                             </div>
                         </div>
                         
-                        {/* Modules Config */}
                         <div className="bg-slate-50 p-3 rounded border">
                             <div className="grid grid-cols-2 gap-2 mb-2">
                                 <div>
@@ -275,7 +269,7 @@ function QuoteContent() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold block mb-1">Module Spec (Free Text)</label>
+                                    <label className="text-xs font-bold block mb-1">Module Spec</label>
                                     <Input className="h-8" value={data.panelSpec} onChange={e => setData({...data, panelSpec: e.target.value})} />
                                 </div>
                             </div>
@@ -294,7 +288,7 @@ function QuoteContent() {
                                     </Select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold block mb-1">Inverter Spec (Free Text)</label>
+                                    <label className="text-xs font-bold block mb-1">Inverter Spec</label>
                                     <Input className="h-8" value={data.inverterSpec} onChange={e => setData({...data, inverterSpec: e.target.value})} />
                                 </div>
                             </div>
@@ -324,12 +318,12 @@ function QuoteContent() {
                     <div className="p-3 bg-yellow-50 text-xs text-yellow-800 rounded border border-yellow-100 flex gap-2">
                         <RefreshCcw className="w-4 h-4 shrink-0 mt-0.5" />
                         <div>
-                            <strong>Note:</strong> The "Technical Makes & Specs" table below automatically updates based on "Project Type" and your Make selections. You can also edit table cells directly.
+                            <strong>Note:</strong> The "Technical Makes & Specs" table below automatically updates based on "Project Type". You can also edit table cells directly.
                         </div>
                     </div>
                 </div>
 
-                {/* Bottom: Actions (Full Width) */}
+                {/* Bottom: Actions */}
                 <div className="md:col-span-2 pt-4 flex gap-3 border-t mt-2">
                     <Button variant="outline" className="w-full md:w-auto ml-auto" onClick={() => window.print()}>
                         <Printer className="w-4 h-4 mr-2" /> Print / PDF
@@ -350,7 +344,8 @@ function QuoteContent() {
       <div className="bg-white p-12 border shadow-xl print:shadow-none print:border-none text-slate-800 font-sans" id="print-area">
         
         {/* --- COVER PAGE --- */}
-        <div className="min-h-[297mm] flex flex-col justify-between">
+        {/* REDUCED MIN-HEIGHT TO PREVENT OVERFLOW ON A4 */}
+        <div className="min-h-[260mm] flex flex-col justify-between">
              <div className="flex items-center gap-4 border-b-4 border-blue-900 pb-6">
                 <div className="relative w-16 h-16">
                      <Image src="/logo.png" alt="Logo" width={64} height={64} className="object-contain" />
@@ -390,12 +385,11 @@ function QuoteContent() {
 
         {/* --- PAGE 2: TECHNICAL DETAILS --- */}
         <div className="break-before pt-8">
-            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">1. Project Technical Summary</h3>
+            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-4 border-l-4 border-blue-900">1. Project Technical Summary</h3>
             
-            <div className="grid grid-cols-2 gap-y-2 gap-x-8 text-sm mb-8">
-                 <div className="flex justify-between border-b border-dashed py-2"><span>Plant Capacity (DC)</span><span className="font-bold">{data.capacity} KWp</span></div>
-                 {/* Removed Evacuation Voltage and Generation as requested */}
-                 <div className="flex justify-between border-b border-dashed py-2 items-center">
+            <div className="grid grid-cols-2 gap-y-2 gap-x-8 text-sm mb-6">
+                 <div className="flex justify-between border-b border-dashed py-1"><span>Plant Capacity (DC)</span><span className="font-bold">{data.capacity} KWp</span></div>
+                 <div className="flex justify-between border-b border-dashed py-1 items-center">
                     <span>Module Type</span>
                     <input 
                         value={data.moduleTypeSummary} 
@@ -405,8 +399,8 @@ function QuoteContent() {
                  </div>
             </div>
 
-            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">2. Technical Makes & Specs</h3>
-            <table className="w-full text-sm border border-slate-300 mb-8">
+            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-4 border-l-4 border-blue-900">2. Technical Makes & Specs</h3>
+            <table className="w-full text-sm border border-slate-300 mb-6">
                 <thead className="bg-blue-900 text-white">
                     <tr>
                         <th className="p-2 text-left w-1/4">Component</th>
@@ -416,22 +410,22 @@ function QuoteContent() {
                 </thead>
                 <tbody>
                     {techRows.map((row, index) => (
-                        <tr key={index} className="border-b">
-                            <td className="p-2 font-bold">
+                        <tr key={index} className="border-b break-inside-avoid">
+                            <td className="p-1 px-2 font-bold align-middle">
                                 <input 
                                     value={row.component} 
                                     onChange={e => handleTableEdit(setTechRows, techRows, index, 'component', e.target.value)}
                                     className="w-full bg-transparent focus:outline-none font-bold"
                                 />
                             </td>
-                            <td className="p-2">
+                            <td className="p-1 px-2 align-middle">
                                 <input 
                                     value={row.spec} 
                                     onChange={e => handleTableEdit(setTechRows, techRows, index, 'spec', e.target.value)}
                                     className="w-full bg-transparent focus:outline-none"
                                 />
                             </td>
-                            <td className="p-2">
+                            <td className="p-1 px-2 align-middle">
                                 <input 
                                     value={row.make} 
                                     onChange={e => handleTableEdit(setTechRows, techRows, index, 'make', e.target.value)}
@@ -443,7 +437,7 @@ function QuoteContent() {
                 </tbody>
             </table>
 
-            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">3. Scope Matrix</h3>
+            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-4 border-l-4 border-blue-900">3. Scope Matrix</h3>
             <table className="w-full text-sm border border-slate-300">
                 <thead className="bg-slate-200">
                     <tr>
@@ -454,12 +448,12 @@ function QuoteContent() {
                 </thead>
                 <tbody className="divide-y">
                     {data.scope.map((item, i) => (
-                        <tr key={i}>
-                            <td className="p-2">{item.name}</td>
-                            <td className={`p-2 text-center ${item.isTara ? 'text-green-600' : 'text-slate-200'}`}>
+                        <tr key={i} className="break-inside-avoid">
+                            <td className="p-1 px-2">{item.name}</td>
+                            <td className={`p-1 px-2 text-center ${item.isTara ? 'text-green-600' : 'text-slate-200'}`}>
                                 {item.isTara ? <Check className="inline w-4 h-4"/> : <X className="inline w-4 h-4"/>}
                             </td>
-                            <td className={`p-2 text-center ${!item.isTara ? 'text-blue-600' : 'text-slate-200'}`}>
+                            <td className={`p-1 px-2 text-center ${!item.isTara ? 'text-blue-600' : 'text-slate-200'}`}>
                                 {!item.isTara ? <Check className="inline w-4 h-4"/> : <X className="inline w-4 h-4"/>}
                             </td>
                         </tr>
@@ -470,9 +464,9 @@ function QuoteContent() {
 
         {/* --- PAGE 3: COMMERCIALS --- */}
         <div className="break-before pt-8">
-            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">4. Commercial Offer</h3>
+            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-4 border-l-4 border-blue-900">4. Commercial Offer</h3>
             
-            <div className="border border-slate-300 mb-8">
+            <div className="border border-slate-300 mb-6 break-inside-avoid">
                 <table className="w-full text-sm">
                     <thead>
                          <tr className="bg-slate-50 border-b">
@@ -497,14 +491,14 @@ function QuoteContent() {
                 </div>
             </div>
 
-            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-6 border-l-4 border-blue-900">5. Payment Terms</h3>
+            <h3 className="text-lg font-bold bg-slate-100 p-2 mb-4 border-l-4 border-blue-900">5. Payment Terms</h3>
             <div className="space-y-6 text-sm">
                 
-                <div>
+                <div className="break-inside-avoid">
                     <h4 className="font-bold text-blue-900 border-b mb-2">A. Supply Portion</h4>
                     <ul className="pl-0 space-y-1">
                         {paymentSupply.map((row, i) => (
-                            <li key={i} className="flex gap-2">
+                            <li key={i} className="flex gap-2 break-inside-avoid">
                                 <input 
                                     className="font-bold w-12 text-right bg-transparent focus:outline-none" 
                                     value={row.percent}
@@ -520,11 +514,11 @@ function QuoteContent() {
                     </ul>
                 </div>
 
-                <div>
+                <div className="break-inside-avoid">
                     <h4 className="font-bold text-blue-900 border-b mb-2">B. Installation Services</h4>
                     <ul className="pl-0 space-y-1">
                         {paymentService.map((row, i) => (
-                            <li key={i} className="flex gap-2">
+                            <li key={i} className="flex gap-2 break-inside-avoid">
                                 <input 
                                     className="font-bold w-12 text-right bg-transparent focus:outline-none" 
                                     value={row.percent}
@@ -542,7 +536,7 @@ function QuoteContent() {
 
             </div>
 
-            <div className="mt-20 border-t pt-8 flex justify-between items-end">
+            <div className="mt-16 border-t pt-8 flex justify-between items-end break-inside-avoid">
                 <div className="text-center">
                     <p className="border-t border-black w-48 pt-2">Accepted By (Client)</p>
                 </div>

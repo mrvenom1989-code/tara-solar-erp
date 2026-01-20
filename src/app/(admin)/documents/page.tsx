@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Factory, Home, Download, Plus, Clock, Search, Loader2, Calendar, Filter } from "lucide-react";
+import { Factory, Home, Download, Plus, Clock, Search, Loader2, Calendar, Filter } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client"; 
 
@@ -140,8 +140,7 @@ export default function DocumentsPage() {
                   {/* DATE FILTER GROUP */}
                   <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-md border border-slate-200">
                       <Select value={dateFilter} onValueChange={setDateFilter}>
-                          {/* Fixed Class Here: w-35 */}
-                          <SelectTrigger className="w-35 h-9 border-none shadow-none bg-transparent focus:ring-0">
+                          <SelectTrigger className="w-32 h-9 border-none shadow-none bg-transparent focus:ring-0">
                               <div className="flex items-center gap-2 text-slate-600">
                                   <Calendar className="w-4 h-4"/>
                                   <SelectValue placeholder="Period" />
@@ -155,7 +154,7 @@ export default function DocumentsPage() {
                           </SelectContent>
                       </Select>
 
-                      {/* CUSTOM INPUTS (Visible only when custom selected) */}
+                      {/* CUSTOM INPUTS */}
                       {dateFilter === 'custom' && (
                           <div className="flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
                               <div className="w-px h-4 bg-slate-300 mx-1"></div>
@@ -184,7 +183,7 @@ export default function DocumentsPage() {
           <CardContent className="p-0">
               {loading ? (
                   <div className="p-12 text-center text-slate-500 flex justify-center items-center gap-2">
-                     <Loader2 className="animate-spin h-5 w-5"/> Loading History...
+                      <Loader2 className="animate-spin h-5 w-5"/> Loading History...
                   </div>
               ) : quotes.length === 0 ? (
                   <div className="text-center py-12 text-slate-500 border-t">
