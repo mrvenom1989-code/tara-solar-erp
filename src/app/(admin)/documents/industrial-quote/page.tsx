@@ -280,26 +280,10 @@ function QuoteContent() {
                             </div>
                         </div>
                         
-                        <div className="bg-slate-50 p-3 rounded border">
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                                <div>
-                                    <label className="text-xs font-bold block mb-1">Module Make</label>
-                                    <Input className="h-8" value={data.panelMake} onChange={e => setData({...data, panelMake: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold block mb-1">Module Spec</label>
-                                    <Input className="h-8" value={data.panelSpec} onChange={e => setData({...data, panelSpec: e.target.value})} />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-xs font-bold block mb-1">Inverter Make</label>
-                                    <Input className="h-8" value={data.inverterMake} onChange={e => setData({...data, inverterMake: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold block mb-1">Inverter Spec</label>
-                                    <Input className="h-8" value={data.inverterSpec} onChange={e => setData({...data, inverterSpec: e.target.value})} />
-                                </div>
+                        <div className="p-3 bg-yellow-50 text-xs text-yellow-800 rounded border border-yellow-100 flex gap-2">
+                            <RefreshCcw className="w-4 h-4 shrink-0 mt-0.5" />
+                            <div>
+                                <strong>Note:</strong> The "Technical Makes & Specs" table below automatically updates based on "Project Type". You can also edit table cells directly.
                             </div>
                         </div>
                     </div>
