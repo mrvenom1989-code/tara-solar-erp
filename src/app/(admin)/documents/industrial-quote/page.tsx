@@ -83,15 +83,19 @@ function QuoteContent() {
   useEffect(() => {
     if (loading) return;
 
+    const moduleMountingStructureSpec = data.projectType === 'Ground Mount' 
+        ? "GROUND MOUNTED SINGLE TILT STRUCTURE" 
+        : "Hot Dip Galvanized (80 micron)";
+
     let rows: TechRow[] = [
-        { component: "Solar Modules", spec: data.panelSpec, make: data.panelMake },
-        { component: "Solar Inverter", spec: data.inverterSpec, make: data.inverterMake },
-        { component: "Module Mounting Structure", spec: "Hot Dip Galvanized (80 micron)", make: "Tara Solar Fab / Reputed" },
-        { component: "DC Cables", spec: "Solar Grade (4/6 sq mm)", make: "Polycab / RR / Apar" },
-        { component: "AC Cables", spec: "Alu. Armored (LT/HT)", make: "Polycab / RR / Apar" },
+        { component: "Solar Modules", spec: "590Wp+ TopCon Bi-Facial", make: "Waaree/RAYZON/SOLEX/GOLDI/VIKRAM/AVADHA" },
+        { component: "Solar Inverter", spec: "String Inverters (Grid Tie)", make: "Sungrow/SOLIS/Vsole" },
+        { component: "Module Mounting Structure", spec: moduleMountingStructureSpec, make: "GI/ Tara Solar Fab / Reputed" },
+        { component: "DC Cables", spec: "TYP 1 / EN TYP 4 SQMM", make: "Polycab / RR / Apar" },
+        { component: "AC Cables", spec: "AL.ARM.CABLE", make: "Polycab / RR / Apar" },
         { component: "LT Panel / ACDB", spec: "Indoor/Outdoor Type", make: "Siemens / L&T / C&S" },
-        { component: "Earthing Kit", spec: "Chemical Earthing (3m)", make: "Reputed" },
-        { component: "Lightning Arrester", spec: "ESE Type (Copper)", make: "Reputed" },
+        { component: "Earthing Kit", spec: "Chemical Earthing (3m)", make: "Ashlok/Erico/Powertrac" },
+        { component: "Lightning Arrester", spec: "ESE Type (Copper)", make: "Erico/Nimbus/Hex/Ingesco/Indelec" },
         { component: "SCADA", spec: "Remote Monitoring Hardware", make: "SolarLog / Meteocontrol / Inbuilt" },
         { component: "Generation Meter", spec: "0.2s Class Accuracy", make: "Secure / L&T" },
         { component: "Main Meter (Net Meter)", spec: "0.2s Class Accuracy (Bi-Dir)", make: "Secure / L&T" },
@@ -100,7 +104,7 @@ function QuoteContent() {
     if (data.projectType === "Ground Mount") {
         rows.push(
             { component: "Inverter Duty Transformer", spec: "Oil Cooled (ONAN)", make: "Voltamp / T&R / Reputed" },
-            { component: "Aux Transformer", spec: "Lighting/Aux Load", make: "Reputed" },
+            { component: "Aux Transformer", spec: "Lighting/Aux Load", make: "Voltamp/Kotson/Danish/Melcon/Electrotherm" },
             { component: "HT Panel (11/33kV)", spec: "VCB / SF6 Breaker", make: "Siemens / ABB / C&S" },
             { component: "CCTV System", spec: "IP Cameras with NVR", make: "Hikvision / CP Plus" }
         );
@@ -277,13 +281,6 @@ function QuoteContent() {
                             <div>
                                 <label className="text-xs font-bold block mb-1 text-[#65A30D]">Rate/KWatt (₹)</label>
                                 <Input value={data.rate} onChange={e => setData({...data, rate: e.target.value})} />
-                            </div>
-                        </div>
-                        
-                        <div className="p-3 bg-yellow-50 text-xs text-yellow-800 rounded border border-yellow-100 flex gap-2">
-                            <RefreshCcw className="w-4 h-4 shrink-0 mt-0.5" />
-                            <div>
-                                <strong>Note:</strong> The "Technical Makes & Specs" table below automatically updates based on "Project Type". You can also edit table cells directly.
                             </div>
                         </div>
                     </div>
@@ -539,7 +536,7 @@ function QuoteContent() {
                     <p className="border-t border-black w-48 pt-2">Accepted By (Client)</p>
                 </div>
                 <div className="text-center">
-                    <p className="font-bold text-xl font-script text-[#65A30D]">Keyur Raval</p>
+                    
                     <p className="border-t border-black w-48 pt-2">Tara Solar Energy</p>
                 </div>
             </div>
