@@ -73,7 +73,7 @@ export function Navbar() {
                 <span className="sr-only">Toggle Navigation</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+            <SheetContent side="right" className="w-72 sm:w-96">
               <SheetTitle className="sr-only">Mobile Menu</SheetTitle>
               <div className="p-4 h-full flex flex-col">
                 <div className="flex flex-col gap-6 text-lg font-medium">
