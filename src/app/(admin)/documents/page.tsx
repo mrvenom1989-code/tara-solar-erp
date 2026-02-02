@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Factory, Home, Download, Plus, Clock, Search, Loader2, Calendar, Filter } from "lucide-react";
+import { Factory, Home, Download, Plus, Clock, Search, Loader2, Calendar, Filter, Edit } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client"; 
 
@@ -226,7 +226,17 @@ export default function DocumentsPage() {
                                           {quote.status}
                                       </Badge>
                                   </TableCell>
-                                  <TableCell className="text-right">
+                                  <TableCell className="text-right space-x-2">
+                                      {/* LINK TO EDIT THE QUOTE */}
+                                      <Link href={quote.type === 'Industrial' 
+                                          ? `/documents/industrial-quote?id=${quote.id}&edit=true` 
+                                          : `/documents/residential-quote?id=${quote.id}&edit=true`
+                                      }>
+                                          <Button size="sm" variant="outline" className="text-slate-600 border-slate-300">
+                                              <Edit className="w-4 h-4 mr-2" /> Edit
+                                          </Button>
+                                      </Link>
+                                      
                                       {/* LINK TO THE GENERATOR PAGE USING ID TO LOAD SNAPSHOT */}
                                       <Link href={quote.type === 'Industrial' 
                                           ? `/documents/industrial-quote?id=${quote.id}` 

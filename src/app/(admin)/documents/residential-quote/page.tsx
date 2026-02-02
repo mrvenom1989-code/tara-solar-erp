@@ -24,6 +24,7 @@ function QuoteContent() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isEditMode = searchParams.get("edit") === "true";
   
   const [currentDate, setCurrentDate] = useState("");
   const [saving, setSaving] = useState(false);
@@ -169,6 +170,34 @@ function QuoteContent() {
     }
   };
 
+  // 8. UPDATE
+  const handleUpdate = async () => {
+    setSaving(true);
+    const quoteId = searchParams.get("id");
+
+    const { error } = await supabase
+        .from('quotations')
+        .update({
+            client_name: data.clientName,
+            type: 'Residential',
+            amount: `₹${formatCurrency(netCost)}`,
+            status: 'Updated',
+            capacity: data.capacity,
+            address: data.address,
+            phone: data.phone,
+            data_snapshot: { ...data, bomRows }
+        })
+        .eq('id', quoteId);
+
+    if (error) {
+        alert("Error updating: " + error.message);
+        setSaving(false);
+    } else {
+        alert("Quote Updated Successfully!");
+        router.push("/documents");
+    }
+  };
+
   if (loading) return <div className="flex justify-center h-screen items-center"><Loader2 className="animate-spin" /></div>;
 
   return (
@@ -288,7 +317,12 @@ function QuoteContent() {
                     <Button variant="outline" onClick={() => window.print()}>
                         <Printer className="w-4 h-4 mr-2" /> Print / PDF
                     </Button>
-                    {!searchParams.get('id') && (
+                    {isEditMode ? (
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleUpdate} disabled={saving}>
+                            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Save className="w-4 h-4 mr-2" />}
+                            Update Quote
+                        </Button>
+                    ) : !searchParams.get('id') && (
                         <Button className="bg-[#65A30D] hover:bg-[#558b0b]" onClick={handleSave} disabled={saving}>
                             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Save className="w-4 h-4 mr-2" />}
                             Save Quote
