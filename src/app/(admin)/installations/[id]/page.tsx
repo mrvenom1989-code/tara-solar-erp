@@ -69,14 +69,58 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       // 2. Fetch Inventory (for dropdown)
       const { data: invData } = await supabase.from('inventory').select('*').gt('stock', 0);
       setInventory(invData || []);
-...
+
+      // 3. Fetch Allocated Materials
+      fetchMaterials();
+
+      // 4. Fetch Documents
+      fetchDocuments();
+
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [id, router]);
+
+  const fetchMaterials = async () => {
+      const { data } = await supabase.from('project_materials').select('*').eq('project_id', id).order('date_used', { ascending: false });
+      setMaterials(data || []);
+  };
+
+  const fetchDocuments = async () => {
+      const { data, error } = await supabase
+        .from('project_documents')
+        .select('*')
+        .eq('project_id', id)
+        .order('created_at', { ascending: false });
+      
+      if (!error) setDocuments(data || []);
+  };
+
+  // UPDATE PROJECT STATUS
+  const handleUpdate = async () => {
+    setUpdating(true);
+    let progress = 0;
+    if (stage === "Site Survey") progress = 10;
+    if (stage === "Design") progress = 30;
+    if (stage === "Material Dispatch") progress = 50;
+    if (stage === "Installation") progress = 80;
+    if (stage === "Net Metering") progress = 90;
+    if (stage === "Completed") progress = 100;
+
     const { error } = await supabase
       .from('projects')
       .update({ stage, status, progress: status === "Completed" ? 100 : progress, expenses })
       .eq('id', id);
 
     if (error) alert("Update failed: " + error.message);
-...
+    else {
+        alert("Project updated successfully!");
+        setProject((prev: any) => ({ ...prev, stage, status, progress, expenses }));
+    }
+    setUpdating(false);
+  };
+
   const handleAddExpense = () => {
     if (!newExpense.description || !newExpense.amount) {
       alert("Please enter a description and amount.");
@@ -106,7 +150,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       const qty = parseInt(newMaterial.quantity);
 
       if(selectedItem.stock < qty) {
-          alert(`Not enough stock! Only ${selectedItem.stock} available.`);
+          alert("Not enough stock! Only " + selectedItem.stock + " available.");
           setAddingMat(false);
           return;
       }
@@ -142,8 +186,8 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       const fileExt = selectedFile.name.split('.').pop();
       // Clean filename to prevent URL issues
       const cleanName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileName = `${Date.now()}_${cleanName}`;
-      const filePath = `${id}/${fileName}`; 
+      const fileName = Date.now() + "_" + cleanName;
+      const filePath = id + "/" + fileName; 
 
       const { error: uploadError } = await supabase
         .storage
@@ -185,7 +229,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
 
   // DELETE DOCUMENT (Storage + DB)
   const handleDeleteDocument = async (doc: any) => {
-      if(!confirm(`Are you sure you want to delete "${doc.name}"?`)) return;
+      if(!confirm("Are you sure you want to delete \"" + doc.name + "\"?")) return;
 
       // 1. Try delete from Storage (Parse path from URL)
       try {
@@ -250,10 +294,11 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-150">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
            <TabsTrigger value="overview">Overview</TabsTrigger>
            <TabsTrigger value="materials">Materials</TabsTrigger>
            <TabsTrigger value="documents">Documents</TabsTrigger>
+           <TabsTrigger value="expenses">Project Expense</TabsTrigger>
         </TabsList>
 
         {/* TAB 1: OVERVIEW */}
@@ -305,7 +350,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                                     <span>100%</span>
                                 </div>
                                 <div className="overflow-hidden h-4 mb-4 text-xs flex rounded bg-slate-200">
-                                    <div style={{ width: `${project.progress}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-[#65A30D] transition-all duration-1000"></div>
+                                    <div style={{ width: project.progress + '%' }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-[#65A30D] transition-all duration-1000"></div>
                                 </div>
                             </div>
 
@@ -316,10 +361,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                                     
                                     return (
                                         <div key={s} className="flex items-center gap-4">
-                                            <div className={`
-                                                w-8 h-8 rounded-full flex items-center justify-center border-2 
-                                                ${isCompleted || isCurrent ? 'bg-green-100 border-green-500 text-green-700' : 'bg-slate-50 border-slate-300 text-slate-300'}
-                                            `}>
+                                            <div className={"w-8 h-8 rounded-full flex items-center justify-center border-2 " + (isCompleted || isCurrent ? 'bg-green-100 border-green-500 text-green-700' : 'bg-slate-50 border-slate-300 text-slate-300')}>
                                                 {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <span className="text-xs">{i+1}</span>}
                                             </div>
                                             <span className={isCurrent ? "font-bold text-slate-900" : "text-slate-500"}>{s}</span>
@@ -480,7 +522,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                                 id="file-upload"
                                 type="file" 
                                 className="cursor-pointer"
-                                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
                              />
                         </div>
                         <Button className="w-full bg-[#65A30D] hover:bg-[#558b0b]" onClick={handleUploadDocument} disabled={uploading}>
@@ -531,6 +573,91 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                                                 </Button>
                                             </a>
                                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleDeleteDocument(doc)}>
+                                                <Trash2 className="w-4 h-4 text-red-500"/>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
+        </TabsContent>
+
+        {/* TAB 4: EXPENSES */}
+        <TabsContent value="expenses" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Add Expense Form */}
+                <Card className="md:col-span-1 h-fit">
+                    <CardHeader className="bg-slate-50 border-b">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                             <Plus className="w-4 h-4"/> Add Expense
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-6">
+                        <div className="space-y-2">
+                             <label className="text-sm font-bold">Description</label>
+                             <Input 
+                                placeholder="e.g. Travel, Food, etc."
+                                value={newExpense.description} 
+                                onChange={e => setNewExpense({...newExpense, description: e.target.value})} 
+                             />
+                        </div>
+                        <div className="space-y-2">
+                             <label className="text-sm font-bold">Amount (₹)</label>
+                             <Input 
+                                type="number" 
+                                placeholder="e.g. 500"
+                                value={newExpense.amount} 
+                                onChange={e => setNewExpense({...newExpense, amount: e.target.value})} 
+                             />
+                        </div>
+                        <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleAddExpense} disabled={addingExpense}>
+                            {addingExpense ? <Loader2 className="w-4 h-4 animate-spin"/> : "Add Expense"}
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                {/* Expenses List */}
+                <Card className="md:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Package className="w-5 h-5"/> Project Expenses
+                            </div>
+                            <div className="text-lg">
+                                Total: <span className="font-bold text-green-600">₹{expenses.reduce((acc, exp) => acc + exp.amount, 0).toLocaleString()}</span>
+                            </div>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {expenses.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                                            No expenses recorded yet.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : expenses.map((exp) => (
+                                    <TableRow key={exp.id}>
+                                        <TableCell className="font-medium">{exp.description}</TableCell>
+                                        <TableCell>₹{exp.amount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-slate-500 text-sm">
+                                            {new Date(exp.date).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleDeleteExpense(exp.id)}>
                                                 <Trash2 className="w-4 h-4 text-red-500"/>
                                             </Button>
                                         </TableCell>
