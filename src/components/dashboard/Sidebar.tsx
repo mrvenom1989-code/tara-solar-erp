@@ -64,7 +64,10 @@ export function Sidebar() {
       {/* Brand */}
       <div className="flex h-16 items-center border-b border-slate-800 px-6 font-bold text-lg">
         <Sun className="mr-2 h-6 w-6 text-[#F59E0B]" />
-        <span>Tara<span className="text-[#65A30D]">Admin</span></span>
+        <span>
+            <span className="text-[#65A30D]">TARA</span>
+            <span className="text-[#F59E0B]">SOLAR</span>
+        </span>
       </div>
 
       {/* Main Nav */}
