@@ -39,6 +39,11 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
   const [docType, setDocType] = useState("Site Plan");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // Expense States
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [newExpense, setNewExpense] = useState({ description: "", amount: "" });
+  const [addingExpense, setAddingExpense] = useState(false);
+
   // FETCH DATA
   useEffect(() => {
     const fetchData = async () => {
@@ -59,60 +64,37 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       setProject(projData);
       setStage(projData.stage || "Site Survey");
       setStatus(projData.status || "In Progress");
+      setExpenses(projData.expenses || []);
 
       // 2. Fetch Inventory (for dropdown)
       const { data: invData } = await supabase.from('inventory').select('*').gt('stock', 0);
       setInventory(invData || []);
-
-      // 3. Fetch Allocated Materials
-      fetchMaterials();
-
-      // 4. Fetch Documents
-      fetchDocuments();
-
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [id, router]);
-
-  const fetchMaterials = async () => {
-      const { data } = await supabase.from('project_materials').select('*').eq('project_id', id).order('date_used', { ascending: false });
-      setMaterials(data || []);
-  };
-
-  const fetchDocuments = async () => {
-      const { data, error } = await supabase
-        .from('project_documents')
-        .select('*')
-        .eq('project_id', id)
-        .order('created_at', { ascending: false });
-      
-      if (!error) setDocuments(data || []);
-  };
-
-  // UPDATE PROJECT STATUS
-  const handleUpdate = async () => {
-    setUpdating(true);
-    let progress = 0;
-    if (stage === "Site Survey") progress = 10;
-    if (stage === "Design") progress = 30;
-    if (stage === "Material Dispatch") progress = 50;
-    if (stage === "Installation") progress = 80;
-    if (stage === "Net Metering") progress = 90;
-    if (stage === "Completed") progress = 100;
-
+...
     const { error } = await supabase
       .from('projects')
-      .update({ stage, status, progress: status === "Completed" ? 100 : progress })
+      .update({ stage, status, progress: status === "Completed" ? 100 : progress, expenses })
       .eq('id', id);
 
     if (error) alert("Update failed: " + error.message);
-    else {
-        alert("Project updated successfully!");
-        setProject((prev: any) => ({ ...prev, stage, status, progress }));
+...
+  const handleAddExpense = () => {
+    if (!newExpense.description || !newExpense.amount) {
+      alert("Please enter a description and amount.");
+      return;
     }
-    setUpdating(false);
+    const expense = {
+      ...newExpense,
+      amount: parseFloat(newExpense.amount),
+      date: new Date().toISOString(),
+      id: Date.now() // temporary unique id
+    };
+    setExpenses([...expenses, expense]);
+    setNewExpense({ description: "", amount: "" });
+  };
+
+  const handleDeleteExpense = (expenseId: number) => {
+    if (!confirm("Are you sure you want to delete this expense?")) return;
+    setExpenses(expenses.filter(e => e.id !== expenseId));
   };
 
   // ADD MATERIAL & DEDUCT STOCK
