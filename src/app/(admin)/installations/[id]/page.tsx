@@ -41,7 +41,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
 
   // Expense States
   const [expenses, setExpenses] = useState<any[]>([]);
-  const [newExpense, setNewExpense] = useState({ description: "", amount: "" });
+  const [newExpense, setNewExpense] = useState({ description: "", amount: "", paymentTo: "" });
   const [addingExpense, setAddingExpense] = useState(false);
 
   // FETCH DATA
@@ -133,7 +133,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       id: Date.now() // temporary unique id
     };
     setExpenses([...expenses, expense]);
-    setNewExpense({ description: "", amount: "" });
+    setNewExpense({ description: "", amount: "", paymentTo: "" });
   };
 
   const handleDeleteExpense = (expenseId: number) => {
@@ -606,6 +606,14 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                              />
                         </div>
                         <div className="space-y-2">
+                             <label className="text-sm font-bold">Payment To</label>
+                             <Input 
+                                placeholder="e.g. John Doe"
+                                value={newExpense.paymentTo} 
+                                onChange={e => setNewExpense({...newExpense, paymentTo: e.target.value})} 
+                             />
+                        </div>
+                        <div className="space-y-2">
                              <label className="text-sm font-bold">Amount (₹)</label>
                              <Input 
                                 type="number" 
@@ -637,6 +645,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Description</TableHead>
+                                    <TableHead>Payment To</TableHead>
                                     <TableHead>Amount</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
@@ -645,13 +654,14 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                             <TableBody>
                                 {expenses.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                                        <TableCell colSpan={5} className="text-center py-8 text-slate-500">
                                             No expenses recorded yet.
                                         </TableCell>
                                     </TableRow>
                                 ) : expenses.map((exp) => (
                                     <TableRow key={exp.id}>
                                         <TableCell className="font-medium">{exp.description}</TableCell>
+                                        <TableCell>{exp.paymentTo}</TableCell>
                                         <TableCell>₹{exp.amount.toLocaleString()}</TableCell>
                                         <TableCell className="text-slate-500 text-sm">
                                             {new Date(exp.date).toLocaleDateString()}
