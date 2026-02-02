@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Phone, Menu } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useState } from "react";
 
 export function Navbar() {
@@ -74,6 +74,7 @@ export function Navbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <SheetTitle className="sr-only">Mobile Menu</SheetTitle>
               <div className="p-4 h-full flex flex-col">
                 <div className="flex flex-col gap-6 text-lg font-medium">
                   <Link href="/services" onClick={() => setSheetOpen(false)} className="hover:text-[#65A30D] transition-colors">Services</Link>
