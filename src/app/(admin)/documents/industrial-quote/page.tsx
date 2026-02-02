@@ -30,6 +30,7 @@ function QuoteContent() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isEditMode = searchParams.get("edit") === "true";
   
   const [currentDate, setCurrentDate] = useState("");
   const [saving, setSaving] = useState(false);
@@ -187,6 +188,31 @@ function QuoteContent() {
     }
   };
 
+  const handleUpdate = async () => {
+    setSaving(true);
+    const quoteId = searchParams.get("id");
+    const { error } = await supabase
+      .from("quotations")
+      .update({
+        client_name: data.clientName,
+        type: "Industrial",
+        amount: `₹${formatCurrency(totalVal)}`,
+        status: "Updated",
+        capacity: data.capacity,
+        address: data.address,
+        data_snapshot: { ...data, techRows, paymentSupply, paymentService },
+      })
+      .eq("id", quoteId);
+
+    if (error) {
+      alert("Error updating: " + error.message);
+      setSaving(false);
+    } else {
+      alert("Industrial Quote Updated!");
+      router.push("/documents");
+    }
+  };
+
   if (loading) return <div className="flex justify-center h-screen items-center"><Loader2 className="animate-spin" /></div>;
 
   return (
@@ -258,15 +284,7 @@ function QuoteContent() {
                             <div className="grid grid-cols-2 gap-2 mb-2">
                                 <div>
                                     <label className="text-xs font-bold block mb-1">Module Make</label>
-                                    <Select value={data.panelMake} onValueChange={(val) => setData({...data, panelMake: val})}>
-                                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Waaree">Waaree</SelectItem>
-                                            <SelectItem value="Adani">Adani</SelectItem>
-                                            <SelectItem value="Goldi">Goldi</SelectItem>
-                                            <SelectItem value="Axitec">Axitec</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <Input className="h-8" value={data.panelMake} onChange={e => setData({...data, panelMake: e.target.value})} />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold block mb-1">Module Spec</label>
@@ -276,16 +294,7 @@ function QuoteContent() {
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="text-xs font-bold block mb-1">Inverter Make</label>
-                                    <Select value={data.inverterMake} onValueChange={(val) => setData({...data, inverterMake: val})}>
-                                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Sungrow">Sungrow</SelectItem>
-                                            <SelectItem value="Solis">Solis</SelectItem>
-                                            <SelectItem value="Growatt">Growatt</SelectItem>
-                                            <SelectItem value="GoodWe">GoodWe</SelectItem>
-                                            <SelectItem value="Vsole">Vsole</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <Input className="h-8" value={data.inverterMake} onChange={e => setData({...data, inverterMake: e.target.value})} />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold block mb-1">Inverter Spec</label>
@@ -328,7 +337,12 @@ function QuoteContent() {
                     <Button variant="outline" className="w-full md:w-auto ml-auto" onClick={() => window.print()}>
                         <Printer className="w-4 h-4 mr-2" /> Print / PDF
                     </Button>
-                    {!searchParams.get('id') && (
+                    {isEditMode ? (
+                        <Button className="w-full md:w-auto bg-blue-900 hover:bg-blue-800" onClick={handleUpdate} disabled={saving}>
+                            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                            Update Record
+                        </Button>
+                    ) : !searchParams.get('id') && (
                         <Button className="w-full md:w-auto bg-blue-900 hover:bg-blue-800" onClick={handleSave} disabled={saving}>
                             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                             Save Record
