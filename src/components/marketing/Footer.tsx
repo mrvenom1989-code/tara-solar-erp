@@ -75,6 +75,7 @@ export function Footer() {
               <li><Link href="/projects" className="hover:text-[#65A30D]">Our Projects</Link></li>
               <li><Link href="/subsidy" className="hover:text-[#65A30D]">Govt. Subsidy</Link></li>
               <li><Link href="/quote" className="hover:text-[#65A30D]">Get a Quote</Link></li>
+              <li><Link href="/about" className="hover:text-[#65A30D]">About Us</Link></li>
               <li><Link href="/dashboard" className="hover:text-[#65A30D]">Staff Login</Link></li>
             </ul>
           </div>

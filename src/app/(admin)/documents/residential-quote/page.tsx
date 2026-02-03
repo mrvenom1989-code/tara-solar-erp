@@ -50,12 +50,14 @@ function QuoteContent() {
     { sn: 2, description: "Solar Inverter (Grid Tie)", make: "", qty: "1 Set" },
     { sn: 3, description: "Module Mounting Structure", make: "Hot Dip Galvanized (HDG)", qty: "Set" },
     { sn: 4, description: "AC Distribution Box (ACDB)", make: "With MCB & SPD", qty: "1 No" },
-    { sn: 5, description: "DC Distribution Box (DCDB)", make: "With Fuse & SPD", qty: "1 No" },
+    { sn: 5, description: "DC Distribution Box (DCDB)", make: "With MCB & SPD", qty: "1 No" },
     { sn: 6, description: "DC Cable (Solar Grade)", make: "Polycab / RR (4 sq mm)", qty: "As Req." },
     { sn: 7, description: "AC Cable", make: "Polycab / RR (Copper)", qty: "As Req." },
     { sn: 8, description: "Earthing Kit", make: "Chemical Earthing (1.5m)", qty: "3 Sets" },
-    { sn: 9, description: "Lightning Arrestor (LA)", make: "Copper Bonded", qty: "1 No" },
-    { sn: 10, description: "Net Metering Liaisoning", make: "DISCOM Application", qty: "Included" },
+    { sn: 9, description: "Earthing Cable", make: "Polycab/RR/Apar", qty: "As Req." },
+    { sn: 10, description: "Lightning Arrestor (LA)", make: "Copper Bonded", qty: "1 No" },
+    { sn: 11, description: "LA Cable", make: "Reputed ISI Brands", qty: "As Req." },
+    { sn: 12, description: "Net Metering Liaisoning", make: "DISCOM Application", qty: "As Req." },
   ]);
 
   // 3. AUTO-SYNC LOGIC (Updates BoM when Master Config changes)
@@ -271,7 +273,8 @@ function QuoteContent() {
                                         <SelectItem value="Waaree">Waaree</SelectItem>
                                         <SelectItem value="Adani">Adani</SelectItem>
                                         <SelectItem value="Goldi">Goldi</SelectItem>
-                                        <SelectItem value="Axitec">Axitec</SelectItem>
+                                        <SelectItem value="Rayzon">Rayzon</SelectItem>
+                                        <SelectItem value="APS">APS</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

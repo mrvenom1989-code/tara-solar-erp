@@ -26,6 +26,18 @@ type PaymentRow = {
   stage: string;
 };
 
+const DEFAULT_SCOPE = [
+    { name: "Design & Engineering", isTara: true, included: true },
+    { name: "Land Acquisition", isTara: false, included: true }, 
+    { name: "Fencing", isTara: false, included: true },          
+    { name: "Civil Foundations (Piling)", isTara: true, included: true },
+    { name: "Liaisoning (GETCO/DISCOM)", isTara: true, included: true },
+    { name: "Water & Construction Power", isTara: false, included: true }, 
+    { name: "HT Line work", isTara: false, included: true },
+    { name: "DISCOM Charges", isTara: false, included: true },
+    { name: "GEDA Charges", isTara: false, included: true },
+];
+
 function QuoteContent() {
   const supabase = createClient();
   const router = useRouter();
@@ -43,6 +55,8 @@ function QuoteContent() {
     capacity: "1000",
     rate: "31500",
     projectType: "Ground Mount",
+    gstType: "excluded",
+    gstRate: "18",
     
     // Tech Config
     panelMake: "Waaree",
@@ -52,14 +66,7 @@ function QuoteContent() {
     moduleTypeSummary: "N-Type Bi-Facial", 
 
     // Configurable Scope Matrix
-    scope: [
-        { name: "Design & Engineering", isTara: true },
-        { name: "Land Acquisition", isTara: false }, 
-        { name: "Fencing", isTara: false },          
-        { name: "Civil Foundations (Piling)", isTara: true },
-        { name: "Liaisoning (GETCO/DISCOM)", isTara: true },
-        { name: "Water & Construction Power", isTara: false }, 
-    ]
+    scope: DEFAULT_SCOPE
   });
 
   // 2. DYNAMIC TABLE STATES
@@ -84,29 +91,39 @@ function QuoteContent() {
     if (loading) return;
 
     const moduleMountingStructureSpec = data.projectType === 'Ground Mount' 
-        ? "GROUND MOUNTED SINGLE TILT STRUCTURE" 
-        : "Hot Dip Galvanized (80 micron)";
+        ? "GROUND MOUNTED SINGLE TILT STRUCTURE/Single axis tracker structure" 
+        : "Hot Dip Galvanized Pipes/Prefabricated Structure/MMS Rail type structure";
+    const moduleMountingStructureMake = data.projectType === 'Ground Mount' 
+        ? "GI Prefabricated Structure" 
+        : "Reputed ISI Brands";    
 
     let rows: TechRow[] = [
         { component: "Solar Modules", spec: "590Wp+ TopCon Bi-Facial", make: "Waaree/RAYZON/SOLEX/GOLDI/VIKRAM/AVADHA" },
-        { component: "Solar Inverter", spec: "String Inverters (Grid Tie)", make: "Sungrow/SOLIS/Vsole" },
-        { component: "Module Mounting Structure", spec: moduleMountingStructureSpec, make: "GI/ Tara Solar Fab / Reputed" },
+        { component: "Solar Inverter", spec: "String Inverters (Grid Tie)", make: "Sungrow/SOLIS/Vsole/Grawatt" },
+        { component: "Module Mounting Structure", spec: moduleMountingStructureSpec, make: moduleMountingStructureMake },
         { component: "DC Cables", spec: "TYP 1 / EN TYP 4 SQMM", make: "Polycab / RR / Apar" },
         { component: "AC Cables", spec: "AL.ARM.CABLE", make: "Polycab / RR / Apar" },
         { component: "LT Panel / ACDB", spec: "Indoor/Outdoor Type", make: "Siemens / L&T / C&S" },
-        { component: "Earthing Kit", spec: "Chemical Earthing (3m)", make: "Ashlok/Erico/Powertrac" },
+        { component: "Earthing Kit", spec: "Chemical Earthing", make: "Ashlok/Erico/Powertrac" },
         { component: "Lightning Arrester", spec: "ESE Type (Copper)", make: "Erico/Nimbus/Hex/Ingesco/Indelec" },
-        { component: "SCADA", spec: "Remote Monitoring Hardware", make: "SolarLog / Meteocontrol / Inbuilt" },
-        { component: "Generation Meter", spec: "0.2s Class Accuracy", make: "Secure / L&T" },
-        { component: "Main Meter (Net Meter)", spec: "0.2s Class Accuracy (Bi-Dir)", make: "Secure / L&T" },
+        { component: "MCS", spec: "Piping with required nozzel points", make: "Reputed ISI Brands" },
     ];
 
     if (data.projectType === "Ground Mount") {
         rows.push(
+            { component: "SCADA", spec: "Remote Monitoring Hardware", make: "SolarLog / Meteocontrol / Inbuilt" },
             { component: "Inverter Duty Transformer", spec: "Oil Cooled (ONAN)", make: "Voltamp / T&R / Reputed" },
-            { component: "Aux Transformer", spec: "Lighting/Aux Load", make: "Voltamp/Kotson/Danish/Melcon/Electrotherm" },
-            { component: "HT Panel (11/33kV)", spec: "VCB / SF6 Breaker", make: "Siemens / ABB / C&S" },
+            { component: "Aux Transformer", spec: "Aux Load", make: "Voltamp/Kotson/Danish/Melcon/Electrotherm" },
+            { component: "HT Panel", spec: "VCB / SF6 Breaker", make: "Siemens / ABB / C&S" },
+            { component: "HT Line work", spec: "Over Head/Underground", make: "Reputed ISI Brands" },
             { component: "CCTV System", spec: "IP Cameras with NVR", make: "Hikvision / CP Plus" }
+        );
+    }
+
+        if (data.projectType === "Roof Top") {
+        rows.push(
+        { component: "Walk way", spec: "FRP Type", make: "Reputed ISI Brands" },
+        { component: "Safty Life line", spec: "J hook Type", make: "Reputed ISI Brands" }
         );
     }
 
@@ -132,6 +149,18 @@ function QuoteContent() {
             
             if (quote && quote.data_snapshot) {
                 const snap = quote.data_snapshot;
+                
+                // Merge scope to ensure new default items appear in old quotes
+                if (snap.scope) {
+                    const mergedScope = DEFAULT_SCOPE.map(defItem => {
+                        const existing = snap.scope.find((s: any) => s.name === defItem.name);
+                        return existing || defItem;
+                    });
+                    snap.scope = mergedScope;
+                } else {
+                    snap.scope = DEFAULT_SCOPE;
+                }
+
                 setData(snap);
                 if(snap.techRows) setTechRows(snap.techRows);
                 if(snap.paymentSupply) setPaymentSupply(snap.paymentSupply);
@@ -151,7 +180,22 @@ function QuoteContent() {
   }, [searchParams]);
 
   // 5. HELPER FUNCTIONS
-  const totalVal = parseFloat(data.capacity) * parseFloat(data.rate);
+  const subTotal = parseFloat(data.capacity) * parseFloat(data.rate);
+  const gstRateVal = parseFloat(data.gstRate || "18");
+  let gstAmount = 0;
+  let grandTotal = 0;
+  let baseAmount = 0;
+
+  if (data.gstType === 'included') {
+      grandTotal = subTotal;
+      baseAmount = subTotal / (1 + gstRateVal / 100);
+      gstAmount = subTotal - baseAmount;
+  } else {
+      baseAmount = subTotal;
+      gstAmount = subTotal * (gstRateVal / 100);
+      grandTotal = subTotal + gstAmount;
+  }
+
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString("en-IN", {
       maximumFractionDigits: 0,
@@ -159,7 +203,15 @@ function QuoteContent() {
     });
   };
 
-  const toggleScope = (index: number) => {
+  const toggleScopeVisibility = (index: number) => {
+      const newScope = [...data.scope];
+      // Handle legacy data where included might be undefined
+      const current = newScope[index].included !== undefined ? newScope[index].included : true;
+      newScope[index].included = !current;
+      setData({ ...data, scope: newScope });
+  };
+
+  const toggleScopeOwner = (index: number) => {
       const newScope = [...data.scope];
       newScope[index].isTara = !newScope[index].isTara;
       setData({ ...data, scope: newScope });
@@ -176,7 +228,7 @@ function QuoteContent() {
     const { error } = await supabase.from('quotations').insert({
         client_name: data.clientName,
         type: 'Industrial',
-        amount: `₹${formatCurrency(totalVal)}`,
+        amount: `₹${formatCurrency(grandTotal)}`,
         status: 'Generated',
         capacity: data.capacity,
         address: data.address, 
@@ -200,7 +252,7 @@ function QuoteContent() {
       .update({
         client_name: data.clientName,
         type: "Industrial",
-        amount: `₹${formatCurrency(totalVal)}`,
+        amount: `₹${formatCurrency(grandTotal)}`,
         status: "Updated",
         capacity: data.capacity,
         address: data.address,
@@ -259,8 +311,8 @@ function QuoteContent() {
                             <span className="text-sm font-bold text-blue-900">Ground Mount</span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="pType" checked={data.projectType === 'Roof Mount'} onChange={() => setData({...data, projectType: 'Roof Mount'})} className="accent-blue-900 w-4 h-4" />
-                            <span className="text-sm font-bold text-blue-900">Roof Mount</span>
+                            <input type="radio" name="pType" checked={data.projectType === 'Roof Top'} onChange={() => setData({...data, projectType: 'Roof Top'})} className="accent-blue-900 w-4 h-4" />
+                            <span className="text-sm font-bold text-blue-900">Roof Top</span>
                         </label>
                     </div>
 
@@ -283,6 +335,29 @@ function QuoteContent() {
                                 <Input value={data.rate} onChange={e => setData({...data, rate: e.target.value})} />
                             </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold block mb-1">GST Mode</label>
+                                <Select value={data.gstType || "excluded"} onValueChange={(v) => setData({...data, gstType: v})}>
+                                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="excluded">Excluded (Extra)</SelectItem>
+                                        <SelectItem value="included">Included</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold block mb-1">GST Rate</label>
+                                <Select value={data.gstRate || "18"} onValueChange={(v) => setData({...data, gstRate: v})}>
+                                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="5">5%</SelectItem>
+                                        <SelectItem value="12">12%</SelectItem>
+                                        <SelectItem value="18">18%</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -292,12 +367,15 @@ function QuoteContent() {
                     <div className="space-y-2 max-h-75 overflow-y-auto pr-2">
                         {data.scope.map((item, index) => (
                             <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded border text-sm">
-                                <span>{item.name}</span>
+                                <div className="flex items-center gap-2">
+                                    <input type="checkbox" checked={item.included !== false} onChange={() => toggleScopeVisibility(index)} className="w-4 h-4 accent-[#65A30D]" />
+                                    <span className={item.included === false ? "text-slate-400 line-through" : ""}>{item.name}</span>
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <Label className={`text-xs ${!item.isTara ? 'font-bold text-blue-700' : 'text-slate-400'}`}>Client</Label>
                                     <Switch 
                                         checked={item.isTara}
-                                        onCheckedChange={() => toggleScope(index)}
+                                        onCheckedChange={() => toggleScopeOwner(index)}
                                         className="data-[state=checked]:bg-[#65A30D]"
                                     />
                                     <Label className={`text-xs ${item.isTara ? 'font-bold text-[#65A30D]' : 'text-slate-400'}`}>Tara</Label>
@@ -442,7 +520,7 @@ function QuoteContent() {
                     </tr>
                 </thead>
                 <tbody className="divide-y">
-                    {data.scope.map((item, i) => (
+                    {data.scope.filter(i => i.included !== false).map((item, i) => (
                         <tr key={i} className="break-inside-avoid">
                             <td className="p-1 px-2">{item.name}</td>
                             <td className={`p-1 px-2 text-center ${item.isTara ? 'text-green-600' : 'text-slate-200'}`}>
@@ -476,14 +554,29 @@ function QuoteContent() {
                                  <p className="text-xs text-slate-500 mt-1">Includes Design, Supply, Civil Work, Installation, Testing & Commissioning</p>
                              </td>
                              <td className="p-4 text-right text-lg font-bold">
-                                 ₹ {formatCurrency(totalVal)}
+                                 ₹ {formatCurrency(baseAmount)}
                              </td>
                          </tr>
+                         <tr className="border-b bg-slate-50">
+                             <td className="p-4 text-right text-sm">
+                                 GST @ {data.gstRate}% ({data.gstType === 'included' ? 'Included' : 'Extra'})
+                             </td>
+                             <td className="p-4 text-right text-lg font-bold">
+                                 ₹ {formatCurrency(gstAmount)}
+                             </td>
+                         </tr>
+                         {data.gstType === 'included' && (
+                             <tr className="border-b bg-slate-100">
+                                 <td className="p-4 text-right font-bold">
+                                     Grand Total
+                                 </td>
+                                 <td className="p-4 text-right text-xl font-bold text-[#65A30D]">
+                                     ₹ {formatCurrency(grandTotal)}
+                                 </td>
+                             </tr>
+                         )}
                     </tbody>
                 </table>
-                <div className="p-4 bg-yellow-50 text-xs text-yellow-800 border-t border-yellow-100">
-                    * <strong>GST Extra as applicable:</strong> 70% of value is Supply (@12%), 30% of value is Service (@18%).
-                </div>
             </div>
 
             <h3 className="text-lg font-bold bg-slate-100 p-2 mb-4 border-l-4 border-blue-900">5. Payment Terms</h3>
