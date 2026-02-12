@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Phone, FileText, Pencil, Loader2, MapPin } from "lucide-react";
+import { Search, Plus, Phone, FileText, Pencil, Loader2, MapPin, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function LeadsPage() {
@@ -87,8 +87,21 @@ export default function LeadsPage() {
         alert("Failed to update lead");
     }
   };
+
+  // 4. DELETE LEAD (NEW)
+  const handleDeleteLead = async (leadId: string) => {
+      if(!confirm("Are you sure you want to delete this lead? This action cannot be undone.")) return;
+
+      const { error } = await supabase.from('leads').delete().eq('id', leadId);
+      
+      if (!error) {
+          setLeads((prev) => prev.filter((l) => l.id !== leadId));
+      } else {
+          alert("Error deleting lead: " + error.message);
+      }
+  };
   
-  // 4. CONVERT TO PROJECT
+  // 5. CONVERT TO PROJECT
   const handleConvertToProject = async (lead: any) => {
     const { error } = await supabase.from('projects').insert({
         client_name: lead.name,
@@ -198,7 +211,12 @@ export default function LeadsPage() {
                                         <Pencil className="w-4 h-4 text-slate-500 hover:text-blue-600" />
                                     </Button>
 
-                                    {/* Quote Button with Address Passing */}
+                                    {/* DELETE BUTTON */}
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleDeleteLead(lead.id)}>
+                                        <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-600" />
+                                    </Button>
+
+                                    {/* Quote Button */}
                                     <Link href={lead.type === "Industrial" 
                                         ? `/documents/industrial-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
                                         : `/documents/residential-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
@@ -248,7 +266,7 @@ export default function LeadsPage() {
                     <Input placeholder="Full street address" value={newLead.address} onChange={(e) => setNewLead({...newLead, address: e.target.value})} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Capacity</Label>
+                    <Label className="text-right">Requirement (kW)</Label>
                     <Input type="number" value={newLead.capacity} onChange={(e) => setNewLead({...newLead, capacity: e.target.value})} className="col-span-3" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -258,7 +276,6 @@ export default function LeadsPage() {
                         <SelectContent>
                             <SelectItem value="Residential">Residential</SelectItem>
                             <SelectItem value="Industrial">Industrial</SelectItem>
-                            {/* Removed Commercial */}
                         </SelectContent>
                     </Select>
                 </div>
@@ -292,7 +309,7 @@ export default function LeadsPage() {
                         <Input value={editingLead.address || ""} onChange={(e) => setEditingLead({...editingLead, address: e.target.value})} className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label className="text-right">Capacity</Label>
+                        <Label className="text-right">Requirement (kW)</Label>
                         <Input type="number" value={editingLead.capacity} onChange={(e) => setEditingLead({...editingLead, capacity: e.target.value})} className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">

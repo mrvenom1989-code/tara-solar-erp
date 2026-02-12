@@ -53,10 +53,14 @@ function QuoteContent() {
     clientName: "Chemtech Intermediated Pvt Ltd",
     address: "GIDC, Ankleshwar, Gujarat", 
     capacity: "1000",
-    rate: "31500",
     projectType: "Ground Mount",
     gstType: "excluded",
-    gstRate: "18",
+
+    // NEW: Split rates
+    rateSystem: "25000",
+    gstRateSystem: "12",
+    rateInstallation: "6500",
+    gstRateInstallation: "18",
     
     // Tech Config
     panelMake: "Waaree",
@@ -149,6 +153,16 @@ function QuoteContent() {
             
             if (quote && quote.data_snapshot) {
                 const snap = quote.data_snapshot;
+
+                // --- MIGRATION LOGIC for backwards compatibility ---
+                if (!snap.rateSystem && snap.rate) {
+                    snap.rateSystem = snap.rate;
+                    snap.rateInstallation = "0";
+                    snap.gstRateSystem = snap.gstRate;
+                    snap.gstRateInstallation = "18"; // Default for new field
+                    delete snap.rate;
+                    delete snap.gstRate;
+                }
                 
                 // Merge scope to ensure new default items appear in old quotes
                 if (snap.scope) {
@@ -161,7 +175,7 @@ function QuoteContent() {
                     snap.scope = DEFAULT_SCOPE;
                 }
 
-                setData(snap);
+                setData(prevData => ({ ...prevData, ...snap }));
                 if(snap.techRows) setTechRows(snap.techRows);
                 if(snap.paymentSupply) setPaymentSupply(snap.paymentSupply);
                 if(snap.paymentService) setPaymentService(snap.paymentService);
@@ -180,21 +194,36 @@ function QuoteContent() {
   }, [searchParams]);
 
   // 5. HELPER FUNCTIONS
-  const subTotal = parseFloat(data.capacity) * parseFloat(data.rate);
-  const gstRateVal = parseFloat(data.gstRate || "18");
-  let gstAmount = 0;
-  let grandTotal = 0;
-  let baseAmount = 0;
+  const capacityNum = parseFloat(data.capacity) || 0;
+  const rateSystemNum = parseFloat(data.rateSystem) || 0;
+  const rateInstallationNum = parseFloat(data.rateInstallation) || 0;
+  const gstRateSystemNum = parseFloat(data.gstRateSystem) || 0;
+  const gstRateInstallationNum = parseFloat(data.gstRateInstallation) || 0;
+
+  const subTotalSystem = capacityNum * rateSystemNum;
+  const subTotalInstallation = capacityNum * rateInstallationNum;
+
+  let baseSystem = subTotalSystem;
+  let baseInstallation = subTotalInstallation;
+  let gstSystem = 0;
+  let gstInstallation = 0;
 
   if (data.gstType === 'included') {
-      grandTotal = subTotal;
-      baseAmount = subTotal / (1 + gstRateVal / 100);
-      gstAmount = subTotal - baseAmount;
+      baseSystem = subTotalSystem / (1 + gstRateSystemNum / 100);
+      gstSystem = subTotalSystem - baseSystem;
+      baseInstallation = subTotalInstallation / (1 + gstRateInstallationNum / 100);
+      gstInstallation = subTotalInstallation - baseInstallation;
   } else {
-      baseAmount = subTotal;
-      gstAmount = subTotal * (gstRateVal / 100);
-      grandTotal = subTotal + gstAmount;
+      gstSystem = baseSystem * (gstRateSystemNum / 100);
+      gstInstallation = baseInstallation * (gstRateInstallationNum / 100);
   }
+
+  const grandTotalSystem = baseSystem + gstSystem;
+  const grandTotalInstallation = baseInstallation + gstInstallation;
+  const totalBaseAmount = baseSystem + baseInstallation;
+  const totalGstAmount = gstSystem + gstInstallation;
+  const grandTotal = totalBaseAmount + totalGstAmount;
+
 
   const formatCurrency = (amount: number) => {
     return amount.toLocaleString("en-IN", {
@@ -228,7 +257,7 @@ function QuoteContent() {
     const { error } = await supabase.from('quotations').insert({
         client_name: data.clientName,
         type: 'Industrial',
-        amount: `₹${formatCurrency(grandTotal)}`,
+        amount: `₹${formatCurrency(data.gstType === 'included' ? grandTotal : totalBaseAmount)}`,
         status: 'Generated',
         capacity: data.capacity,
         address: data.address, 
@@ -252,7 +281,7 @@ function QuoteContent() {
       .update({
         client_name: data.clientName,
         type: "Industrial",
-        amount: `₹${formatCurrency(grandTotal)}`,
+        amount: `₹${formatCurrency(data.gstType === 'included' ? grandTotal : totalBaseAmount)}`,
         status: "Updated",
         capacity: data.capacity,
         address: data.address,
@@ -331,12 +360,6 @@ function QuoteContent() {
                                 <Input value={data.capacity} onChange={e => setData({...data, capacity: e.target.value})} />
                             </div>
                             <div>
-                                <label className="text-xs font-bold block mb-1 text-[#65A30D]">Rate/KWatt (₹)</label>
-                                <Input value={data.rate} onChange={e => setData({...data, rate: e.target.value})} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
                                 <label className="text-xs font-bold block mb-1">GST Mode</label>
                                 <Select value={data.gstType || "excluded"} onValueChange={(v) => setData({...data, gstType: v})}>
                                     <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
@@ -346,16 +369,47 @@ function QuoteContent() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div>
-                                <label className="text-xs font-bold block mb-1">GST Rate</label>
-                                <Select value={data.gstRate || "18"} onValueChange={(v) => setData({...data, gstRate: v})}>
-                                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="5">5%</SelectItem>
-                                        <SelectItem value="12">12%</SelectItem>
-                                        <SelectItem value="18">18%</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                        </div>
+
+                        {/* ----- Rate Split ----- */}
+                        <div className="space-y-3 pt-3 mt-3 border-t">
+                            <h5 className="font-semibold text-slate-600">SOLAR ROOFTOP POWER GENERATION SYSTEM</h5>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold block mb-1 text-[#65A30D]">Rate/KWatt (₹)</label>
+                                    <Input value={data.rateSystem} onChange={e => setData({...data, rateSystem: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold block mb-1">GST Rate</label>
+                                    <Select value={data.gstRateSystem || "12"} onValueChange={(v) => setData({...data, gstRateSystem: v})}>
+                                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="5">5%</SelectItem>
+                                            <SelectItem value="12">12%</SelectItem>
+                                            <SelectItem value="18">18%</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-3 pt-3 mt-3 border-t">
+                            <h5 className="font-semibold text-slate-600">INSTALLATION AND TOOLS</h5>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold block mb-1 text-[#65A30D]">Rate/KWatt (₹)</label>
+                                    <Input value={data.rateInstallation} onChange={e => setData({...data, rateInstallation: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold block mb-1">GST Rate</label>
+                                    <Select value={data.gstRateInstallation || "18"} onValueChange={(v) => setData({...data, gstRateInstallation: v})}>
+                                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="5">5%</SelectItem>
+                                            <SelectItem value="12">12%</SelectItem>
+                                            <SelectItem value="18">18%</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -548,33 +602,84 @@ function QuoteContent() {
                          </tr>
                     </thead>
                     <tbody>
-                         <tr className="border-b">
-                             <td className="p-4">
-                                 <strong>Turnkey EPC for {data.capacity} KWp Solar Power Plant</strong>
-                                 <p className="text-xs text-slate-500 mt-1">Includes Design, Supply, Civil Work, Installation, Testing & Commissioning</p>
-                             </td>
-                             <td className="p-4 text-right text-lg font-bold">
-                                 ₹ {formatCurrency(baseAmount)}
-                             </td>
-                         </tr>
-                         <tr className="border-b bg-slate-50">
-                             <td className="p-4 text-right text-sm">
-                                 GST @ {data.gstRate}% ({data.gstType === 'included' ? 'Included' : 'Extra'})
-                             </td>
-                             <td className="p-4 text-right text-lg font-bold">
-                                 ₹ {formatCurrency(gstAmount)}
-                             </td>
-                         </tr>
-                         {data.gstType === 'included' && (
-                             <tr className="border-b bg-slate-100">
-                                 <td className="p-4 text-right font-bold">
-                                     Grand Total
-                                 </td>
-                                 <td className="p-4 text-right text-xl font-bold text-[#65A30D]">
-                                     ₹ {formatCurrency(grandTotal)}
-                                 </td>
-                             </tr>
-                         )}
+                        {/* --- Base Amounts --- */}
+                        <tr className="border-b">
+                            <td className="p-4">
+                                <strong>A. SOLAR ROOFTOP POWER GENERATION SYSTEM</strong>
+                                <p className="text-xs text-slate-500 mt-1">Design, Supply & Commissioning of {data.capacity} KWp Solar System</p>
+                            </td>
+                            <td className="p-4 text-right text-lg font-bold align-bottom">
+                                ₹ {formatCurrency(baseSystem)}
+                            </td>
+                        </tr>
+                        <tr className="border-b">
+                            <td className="p-4">
+                                <strong>B. INSTALLATION AND TOOLS</strong>
+                                <p className="text-xs text-slate-500 mt-1">Civil Work, Structure & Module Mounting, Electricals</p>
+                            </td>
+                            <td className="p-4 text-right text-lg font-bold align-bottom">
+                                ₹ {formatCurrency(baseInstallation)}
+                            </td>
+                        </tr>
+
+                        {/* --- TOTALS & GST --- */}
+                        {data.gstType === 'excluded' ? (
+                            <>
+                                <tr className="bg-slate-100 border-b">
+                                    <td className="p-4 text-right font-bold">
+                                        Total (A + B)
+                                        <span className="text-xs font-normal text-slate-500"> (GST Exclusive)</span>
+                                    </td>
+                                    <td className="p-4 text-right text-2xl font-bold text-[#65A30D]">
+                                        ₹ {formatCurrency(totalBaseAmount)}
+                                    </td>
+                                </tr>
+                                <tr className="border-b">
+                                    <td className="p-4 text-right text-sm">
+                                        Excluded GST on System @ {data.gstRateSystem}%
+                                    </td>
+                                    <td className="p-4 text-right text-lg font-bold">
+                                        ₹ {formatCurrency(gstSystem)}
+                                    </td>
+                                </tr>
+                                <tr className="border-b">
+                                    <td className="p-4 text-right text-sm">
+                                        Excluded GST on Installation @ {data.gstRateInstallation}%
+                                    </td>
+                                    <td className="p-4 text-right text-lg font-bold">
+                                        ₹ {formatCurrency(gstInstallation)}
+                                    </td>
+                                </tr>
+                            </>
+                        ) : (
+                            <>
+                                <tr className="border-b">
+                                    <td className="p-4 text-right text-sm">
+                                        GST on System @ {data.gstRateSystem}%
+                                    </td>
+                                    <td className="p-4 text-right text-lg font-bold">
+                                        ₹ {formatCurrency(gstSystem)}
+                                    </td>
+                                </tr>
+                                <tr className="border-b">
+                                    <td className="p-4 text-right text-sm">
+                                        GST on Installation @ {data.gstRateInstallation}%
+                                    </td>
+                                    <td className="p-4 text-right text-lg font-bold">
+                                        ₹ {formatCurrency(gstInstallation)}
+                                    </td>
+                                </tr>
+                                <tr className="bg-slate-100">
+                                    <td className="p-4 text-right font-bold">
+                                        Grand Total
+                                        <span className="text-xs font-normal text-slate-500"> (GST Included)</span>
+                                    </td>
+                                    <td className="p-4 text-right text-2xl font-bold text-[#65A30D]">
+                                        ₹ {formatCurrency(grandTotal)}
+                                    </td>
+                                </tr>
+                            </>
+                        )}
                     </tbody>
                 </table>
             </div>
