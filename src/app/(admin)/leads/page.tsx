@@ -22,6 +22,9 @@ export default function LeadsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [savingLead, setSavingLead] = useState(false);
   
   // Dialog States
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -54,14 +57,21 @@ export default function LeadsPage() {
 
   // 2. ADD NEW LEAD
   const handleAddLead = async () => {
-    const { error } = await supabase.from('leads').insert([newLead]);
+    if (!newLead.name || !newLead.phone) {
+      alert("Please enter at least a Name and Phone number.");
+      return;
+    }
+    setSavingLead(true);
+    const payload = { ...newLead, capacity: Number(newLead.capacity) };
+    const { error } = await supabase.from('leads').insert([payload]);
     if (!error) {
         setIsAddOpen(false);
-        setNewLead({ name: "", phone: "", city: "", address: "", capacity: "3", type: "Residential", status: "New" }); // Reset
-        fetchLeads(); // Refresh
+        setNewLead({ name: "", phone: "", city: "", address: "", capacity: "3", type: "Residential", status: "New" });
+        fetchLeads();
     } else {
         alert("Error adding lead: " + error.message);
     }
+    setSavingLead(false);
   };
 
   // 3. UPDATE EXISTING LEAD
@@ -74,7 +84,7 @@ export default function LeadsPage() {
           city: editingLead.city, 
           address: editingLead.address, 
           phone: editingLead.phone, 
-          capacity: editingLead.capacity, 
+          capacity: Number(editingLead.capacity), 
           status: editingLead.status, 
           type: editingLead.type 
       })
@@ -88,28 +98,28 @@ export default function LeadsPage() {
     }
   };
 
-  // 4. DELETE LEAD (NEW)
+  // 4. DELETE LEAD
   const handleDeleteLead = async (leadId: string) => {
-      if(!confirm("Are you sure you want to delete this lead? This action cannot be undone.")) return;
-
+      setDeleting(true);
       const { error } = await supabase.from('leads').delete().eq('id', leadId);
-      
       if (!error) {
           setLeads((prev) => prev.filter((l) => l.id !== leadId));
       } else {
           alert("Error deleting lead: " + error.message);
       }
+      setConfirmDeleteId(null);
+      setDeleting(false);
   };
   
   // 5. CONVERT TO PROJECT
   const handleConvertToProject = async (lead: any) => {
     const { error } = await supabase.from('projects').insert({
         client_name: lead.name,
-        location: lead.address || lead.city, // Use full address if available
+        location: lead.address || lead.city,
         capacity: Number(lead.capacity),
         type: lead.type,
         status: 'In Progress',
-        stage: 'Site Survey',
+        stage: lead.type === 'Residential' ? 'Consumer Registration' : 'Site Survey',
         progress: 10
     });
 
@@ -177,7 +187,11 @@ export default function LeadsPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {leads.filter(l => l.name?.toLowerCase().includes(searchTerm.toLowerCase())).map((lead) => (
+                        {leads.filter(l =>
+                            (l.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+                            (l.phone || "").includes(searchTerm) ||
+                            (l.city?.toLowerCase() || "").includes(searchTerm.toLowerCase())
+                        ).map((lead) => (
                             <TableRow key={lead.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                                 <TableCell className="font-medium">
                                     {lead.name}
@@ -205,36 +219,45 @@ export default function LeadsPage() {
                                         {lead.status}
                                     </Badge>
                                 </TableCell>
-                                <TableCell className="text-right flex items-center justify-end gap-2">
-                                    
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleEditClick(lead)}>
-                                        <Pencil className="w-4 h-4 text-slate-500 hover:text-blue-600" />
-                                    </Button>
-
-                                    {/* DELETE BUTTON */}
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleDeleteLead(lead.id)}>
-                                        <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-600" />
-                                    </Button>
-
-                                    {/* Quote Button */}
-                                    <Link href={lead.type === "Industrial" 
-                                        ? `/documents/industrial-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
-                                        : `/documents/residential-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
-                                    }>
-                                        <Button size="sm" variant="outline" className="h-8 border-slate-300 text-slate-600">
-                                            <FileText className="w-3 h-3 mr-2" /> Quote
-                                        </Button>
-                                    </Link>
-
-                                    {lead.status !== "Won" && (
-                                        <Button 
-                                            size="sm" 
-                                            className="h-8 bg-[#65A30D] hover:bg-[#558b0b] text-white"
-                                            onClick={() => handleConvertToProject(lead)}
-                                        >
-                                            Convert
-                                        </Button>
-                                    )}
+                                <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        {confirmDeleteId === lead.id ? (
+                                            <>
+                                                <span className="text-xs text-red-600 font-medium">Sure?</span>
+                                                <Button size="sm" variant="destructive" className="h-7 text-xs px-2"
+                                                    onClick={() => handleDeleteLead(lead.id)} disabled={deleting}>
+                                                    {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : "Delete"}
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-7 text-xs px-2"
+                                                    onClick={() => setConfirmDeleteId(null)} disabled={deleting}>
+                                                    Cancel
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleEditClick(lead)}>
+                                                    <Pencil className="w-4 h-4 text-slate-500 hover:text-blue-600" />
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setConfirmDeleteId(lead.id)}>
+                                                    <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-600" />
+                                                </Button>
+                                                <Link href={lead.type === "Industrial"
+                                                    ? `/documents/industrial-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
+                                                    : `/documents/residential-quote?client=${encodeURIComponent(lead.name)}&capacity=${lead.capacity}&address=${encodeURIComponent(lead.address || "")}&phone=${encodeURIComponent(lead.phone || "")}`
+                                                }>
+                                                    <Button size="sm" variant="outline" className="h-8 border-slate-300 text-slate-600">
+                                                        <FileText className="w-3 h-3 mr-2" /> Quote
+                                                    </Button>
+                                                </Link>
+                                                {lead.status !== "Won" && (
+                                                    <Button size="sm" className="h-8 bg-[#65A30D] hover:bg-[#558b0b] text-white"
+                                                        onClick={() => handleConvertToProject(lead)}>
+                                                        Convert
+                                                    </Button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -281,7 +304,10 @@ export default function LeadsPage() {
                 </div>
             </div>
             <DialogFooter>
-                 <Button onClick={handleAddLead} className="bg-[#65A30D]">Save Lead</Button>
+                 <Button onClick={handleAddLead} className="bg-[#65A30D]" disabled={savingLead}>
+                     {savingLead ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                     Save Lead
+                 </Button>
             </DialogFooter>
          </DialogContent>
       </Dialog>

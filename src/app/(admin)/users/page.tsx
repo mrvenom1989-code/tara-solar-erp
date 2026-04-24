@@ -177,7 +177,7 @@ export default function UserManagementPage() {
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Password</Label>
-                    <Input type="text" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="col-span-3" placeholder="Initial Password" />
+                    <Input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="col-span-3" placeholder="Initial Password" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Role</Label>
@@ -238,7 +238,7 @@ export default function UserManagementPage() {
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right text-slate-500">New Pass</Label>
                         <Input 
-                            type="text" 
+                            type="password" 
                             placeholder="Leave empty to keep current" 
                             value={formData.password} 
                             onChange={e => setFormData({...formData, password: e.target.value})} 

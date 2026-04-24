@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Calendar, CheckCircle2, MapPin, Ruler, User, Loader2, Save, Package, Plus, FileText, Upload, Download, Trash2, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 export default function InstallationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -37,7 +38,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
   const [documents, setDocuments] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [docType, setDocType] = useState("Site Plan");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   // Expense States
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -63,7 +64,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
         return;
       }
       setProject(projData);
-      setStage(projData.stage || "Site Survey");
+      setStage(projData.stage || (projData.type === 'Residential' ? 'Consumer Registration' : 'Site Survey'));
       setStatus(projData.status || "In Progress");
 
       // 2. Fetch Inventory (for dropdown)
@@ -114,21 +115,39 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
   const handleUpdate = async () => {
     setUpdating(true);
     let progress = 0;
-    if (stage === "Site Survey") progress = 10;
-    if (stage === "Design") progress = 30;
-    if (stage === "Material Dispatch") progress = 50;
-    if (stage === "Installation") progress = 80;
-    if (stage === "Net Metering") progress = 90;
-    if (stage === "Completed") progress = 100;
+
+    if (project.type === "Residential") {
+      const residentialStages = [
+        "Consumer Registration",
+        "Application Submission",
+        "Feasibility Approval",
+        "Vendor Selection",
+        "Upload Agreement",
+        "Solar Installation Details",
+        "Project Inspection",
+        "Project Commissioning",
+        "Subsidy Request",
+        "Subsidy Disbursal"
+      ];
+      const stageIndex = residentialStages.indexOf(stage);
+      progress = stageIndex >= 0 ? (stageIndex + 1) * 10 : 0;
+    } else {
+      if (stage === "Site Survey") progress = 10;
+      if (stage === "Design") progress = 30;
+      if (stage === "Material Dispatch") progress = 50;
+      if (stage === "Installation") progress = 80;
+      if (stage === "Net Metering") progress = 90;
+      if (stage === "Completed") progress = 100;
+    }
 
     const { error } = await supabase
       .from('projects')
       .update({ stage, status, progress: status === "Completed" ? 100 : progress })
       .eq('id', id);
 
-    if (error) alert("Update failed: " + error.message);
+    if (error) toast.error("Update failed: " + error.message);
     else {
-        alert("Project updated successfully!");
+        toast.success("Project updated successfully!");
         setProject((prev: any) => ({ ...prev, stage, status, progress }));
     }
     setUpdating(false);
@@ -166,7 +185,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
     }
 
     if (error) {
-        alert("Error saving expense: " + error.message);
+        toast.error("Error saving expense: " + error.message);
     } else {
         fetchExpenses();
         handleCancelEdit();
@@ -179,7 +198,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
     
     const { error } = await supabase.from('project_expenses').delete().eq('id', expenseId);
     if (error) {
-        alert("Error deleting expense: " + error.message);
+        toast.error("Error deleting expense: " + error.message);
     } else {
         fetchExpenses();
         if (editingExpenseId === expenseId) handleCancelEdit();
@@ -212,63 +231,78 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
           fetchMaterials();
           setNewMaterial({ itemId: "", quantity: "1" });
           setInventory(prev => prev.map(i => i.id === selectedItem.id ? {...i, stock: i.stock - qty} : i));
+          toast.success("Material allocated successfully!");
       } else {
-          alert("Error adding material: " + matError.message);
+          toast.error("Error adding material: " + matError.message);
       }
       setAddingMat(false);
   };
 
-  // UPLOAD DOCUMENT (Storage + DB)
+  // UPLOAD DOCUMENTS (supports multiple files)
   const handleUploadDocument = async () => {
-      if (!selectedFile) {
-          alert("Please select a file to upload.");
+      if (selectedFiles.length === 0) {
+          toast.error("Please select at least one file to upload.");
           return;
       }
 
       setUploading(true);
-      
-      // 1. Upload to Supabase Storage
-      const fileExt = selectedFile.name.split('.').pop();
-      // Clean filename to prevent URL issues
-      const cleanName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileName = Date.now() + "_" + cleanName;
-      const filePath = id + "/" + fileName; 
+      let successCount = 0;
+      let failCount = 0;
 
-      const { error: uploadError } = await supabase
-        .storage
-        .from('project-files') 
-        .upload(filePath, selectedFile);
+      for (const file of selectedFiles) {
+          // Clean filename to prevent URL issues
+          const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const fileName = Date.now() + "_" + cleanName;
+          const filePath = id + "/" + fileName;
 
-      if (uploadError) {
-          alert("Error uploading file: " + uploadError.message);
-          setUploading(false);
-          return;
+          // 1. Upload to Supabase Storage
+          const { error: uploadError } = await supabase
+              .storage
+              .from('project-files')
+              .upload(filePath, file);
+
+          if (uploadError) {
+              failCount++;
+              console.error("Upload error for", file.name, uploadError.message);
+              continue;
+          }
+
+          // 2. Get Public URL
+          const { data: { publicUrl } } = supabase
+              .storage
+              .from('project-files')
+              .getPublicUrl(filePath);
+
+          // 3. Save Record to Database
+          const { error: dbError } = await supabase.from('project_documents').insert({
+              project_id: id,
+              name: file.name,
+              type: docType,
+              url: publicUrl
+          });
+
+          if (dbError) {
+              failCount++;
+              console.error("DB error for", file.name, dbError.message);
+          } else {
+              successCount++;
+          }
       }
 
-      // 2. Get Public URL
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from('project-files')
-        .getPublicUrl(filePath);
+      // 4. Refresh & reset
+      fetchDocuments();
+      setSelectedFiles([]);
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
 
-      // 3. Save Record to Database
-      const { error: dbError } = await supabase.from('project_documents').insert({
-          project_id: id,
-          name: selectedFile.name, // Use original filename for display
-          type: docType,
-          url: publicUrl
-      });
-
-      if (dbError) {
-          alert("Error saving document record: " + dbError.message);
+      if (successCount > 0 && failCount === 0) {
+          toast.success(`${successCount} file${successCount > 1 ? 's' : ''} uploaded successfully!`);
+      } else if (successCount > 0 && failCount > 0) {
+          toast.warning(`${successCount} uploaded, ${failCount} failed. Check console for details.`);
       } else {
-          fetchDocuments(); 
-          setSelectedFile(null); 
-          const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-          if (fileInput) fileInput.value = "";
-          alert("Document uploaded successfully!");
+          toast.error("All uploads failed. Please try again.");
       }
-      
+
       setUploading(false);
   };
 
@@ -414,8 +448,19 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                             </div>
 
                             <div className="space-y-4 mt-6">
-                                {['Site Survey', 'Design', 'Material Dispatch', 'Installation', 'Net Metering', 'Completed'].map((s, i) => {
-                                    const isCompleted = ['Site Survey', 'Design', 'Material Dispatch', 'Installation', 'Net Metering', 'Completed'].indexOf(project.stage) >= i;
+                                {(project.type === 'Residential' ? [
+                                    "Consumer Registration",
+                                    "Application Submission",
+                                    "Feasibility Approval",
+                                    "Vendor Selection",
+                                    "Upload Agreement",
+                                    "Solar Installation Details",
+                                    "Project Inspection",
+                                    "Project Commissioning",
+                                    "Subsidy Request",
+                                    "Subsidy Disbursal"
+                                ] : ['Site Survey', 'Design', 'Material Dispatch', 'Installation', 'Net Metering', 'Completed']).map((s, i, arr) => {
+                                    const isCompleted = arr.indexOf(project.stage) >= i;
                                     const isCurrent = project.stage === s;
                                     
                                     return (
@@ -442,12 +487,29 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                                 <Select value={stage} onValueChange={setStage}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Site Survey">Site Survey</SelectItem>
-                                        <SelectItem value="Design">Design</SelectItem>
-                                        <SelectItem value="Material Dispatch">Material Dispatch</SelectItem>
-                                        <SelectItem value="Installation">Installation</SelectItem>
-                                        <SelectItem value="Net Metering">Net Metering</SelectItem>
-                                        <SelectItem value="Completed">Completed</SelectItem>
+                                        {project.type === 'Residential' ? (
+                                            <>
+                                                <SelectItem value="Consumer Registration">Consumer Registration</SelectItem>
+                                                <SelectItem value="Application Submission">Application Submission</SelectItem>
+                                                <SelectItem value="Feasibility Approval">Feasibility Approval</SelectItem>
+                                                <SelectItem value="Vendor Selection">Vendor Selection</SelectItem>
+                                                <SelectItem value="Upload Agreement">Upload Agreement</SelectItem>
+                                                <SelectItem value="Solar Installation Details">Solar Installation Details</SelectItem>
+                                                <SelectItem value="Project Inspection">Project Inspection</SelectItem>
+                                                <SelectItem value="Project Commissioning">Project Commissioning</SelectItem>
+                                                <SelectItem value="Subsidy Request">Subsidy Request</SelectItem>
+                                                <SelectItem value="Subsidy Disbursal">Subsidy Disbursal</SelectItem>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <SelectItem value="Site Survey">Site Survey</SelectItem>
+                                                <SelectItem value="Design">Design</SelectItem>
+                                                <SelectItem value="Material Dispatch">Material Dispatch</SelectItem>
+                                                <SelectItem value="Installation">Installation</SelectItem>
+                                                <SelectItem value="Net Metering">Net Metering</SelectItem>
+                                                <SelectItem value="Completed">Completed</SelectItem>
+                                            </>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -576,16 +638,25 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                             </Select>
                         </div>
                         <div className="space-y-2">
-                             <label className="text-sm font-bold">Select File</label>
-                             <Input 
+                             <label className="text-sm font-bold">Select Files</label>
+                             <Input
                                 id="file-upload"
-                                type="file" 
+                                type="file"
+                                multiple
                                 className="cursor-pointer"
-                                onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                                onChange={e => setSelectedFiles(e.target.files ? Array.from(e.target.files) : [])}
                              />
+                             {selectedFiles.length > 1 && (
+                                 <p className="text-xs text-slate-500">
+                                     {selectedFiles.length} files selected
+                                 </p>
+                             )}
                         </div>
                         <Button className="w-full bg-[#65A30D] hover:bg-[#558b0b]" onClick={handleUploadDocument} disabled={uploading}>
-                            {uploading ? <Loader2 className="w-4 h-4 animate-spin"/> : "Upload File"}
+                            {uploading
+                                ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Uploading...</>
+                                : <><Upload className="w-4 h-4 mr-2" /> Upload {selectedFiles.length > 1 ? `${selectedFiles.length} Files` : 'File'}</>
+                            }
                         </Button>
                     </CardContent>
                 </Card>

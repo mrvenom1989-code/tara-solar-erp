@@ -56,17 +56,20 @@ export async function createNewUser(prevState: any, formData: FormData) {
 export async function deleteUser(email: string) {
   const supabaseAdmin = getAdminClient()
 
-  // A. Find Auth ID by Email
-  // (Since we didn't store UUID in public.users, we look it up by email)
-  const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-  const user = users.find(u => u.email === email)
+  // Find Auth user by scanning (paginated). Future improvement: store auth_uid in public.users table.
+  const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+  
+  if (listError) return { success: false, message: listError.message }
 
-  if (user) {
-    // B. Delete from Auth (Login)
-    await supabaseAdmin.auth.admin.deleteUser(user.id)
+  const authUser = users.find(u => u.email === email)
+
+  if (authUser) {
+    // Delete from Auth (Login)
+    const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(authUser.id)
+    if (authErr) return { success: false, message: authErr.message }
   }
 
-  // C. Delete from Public (Profile)
+  // Delete from Public profile table
   const { error } = await supabaseAdmin.from('users').delete().eq('email', email)
 
   if (error) return { success: false, message: error.message }
@@ -90,14 +93,13 @@ export async function updateUser(id: number, name: string, role: string, status:
 export async function resetUserPassword(email: string, newPassword: string) {
   const supabaseAdmin = getAdminClient()
 
-  // A. Find Auth ID
-  const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-  const user = users.find(u => u.email === email)
+  const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+  if (listError) return { success: false, message: listError.message }
 
-  if (!user) return { success: false, message: "User not found in Auth system" }
+  const authUser = users.find(u => u.email === email)
+  if (!authUser) return { success: false, message: "User not found in Auth system" }
 
-  // B. Update Password
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
     password: newPassword
   })
 

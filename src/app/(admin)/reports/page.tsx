@@ -119,6 +119,31 @@ export default function ReportsPage() {
   });
   const topStages = Object.entries(statusCounts).sort(([, a], [, b]) => b - a).slice(0, 5);
 
+  // Build last 6 months revenue chart data from real quotes
+  const getMonthlyChartData = () => {
+    const months: { label: string; revenue: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const label = d.toLocaleDateString('en-IN', { month: 'short' });
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const monthRevenue = quotes
+        .filter(q => {
+          const qDate = new Date(q.created_at);
+          return qDate.getFullYear() === year && qDate.getMonth() === month;
+        })
+        .reduce((sum, q) => {
+          const clean = (q.amount || "").toString().replace(/[^0-9.]/g, '');
+          return sum + (parseFloat(clean) || 0);
+        }, 0);
+      months.push({ label, revenue: monthRevenue });
+    }
+    return months;
+  };
+  const chartData = getMonthlyChartData();
+  const maxRevenue = Math.max(...chartData.map(m => m.revenue), 1);
+
   const openDrillDown = (type: string) => {
       setDialogType(type);
       setDialogOpen(true);
@@ -239,22 +264,25 @@ export default function ReportsPage() {
             {/* 2. Analysis Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <Card className="col-span-4">
-                    <CardHeader><CardTitle>Revenue Trend</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Revenue Trend (Last 6 Months)</CardTitle></CardHeader>
                     <CardContent className="pl-2">
-                        <div className="h-50 flex items-end gap-4 p-4 border-b border-l border-slate-200">
-                            {['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan'].map((m, i) => (
-                                <div key={m} className="flex-1 flex flex-col justify-end items-center gap-2 group">
-                                    <div 
-                                        className="w-full bg-slate-900 group-hover:bg-[#65A30D] transition-colors rounded-t-sm" 
-                                        style={{height: `${30 + (i * 10) + Math.random() * 20}%`}} 
-                                    ></div>
-                                    <span className="text-xs text-slate-500">{m}</span>
+                        <div className="h-48 flex items-end gap-3 px-4 pb-2 border-b border-l border-slate-200">
+                            {chartData.map((m, i) => (
+                                <div key={i} className="flex-1 flex flex-col justify-end items-center gap-1 group">
+                                    <span className="text-xs text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {m.revenue > 0 ? `₹${(m.revenue/1000).toFixed(0)}K` : ''}
+                                    </span>
+                                    <div
+                                        className="w-full bg-slate-200 group-hover:bg-[#65A30D] transition-colors rounded-t-sm"
+                                        style={{ height: m.revenue > 0 ? `${Math.max((m.revenue / maxRevenue) * 100, 4)}%` : '4%', opacity: m.revenue > 0 ? 1 : 0.3 }}
+                                    />
+                                    <span className="text-xs text-slate-500">{m.label}</span>
                                 </div>
                             ))}
                         </div>
-                        <p className="text-xs text-slate-400 mt-4 text-center">
-                            * Mock Visualization for V1
-                        </p>
+                        {quotes.length === 0 && (
+                            <p className="text-xs text-slate-400 mt-4 text-center italic">No accepted quotes in this period to chart.</p>
+                        )}
                     </CardContent>
                 </Card>
                 
