@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Calendar, CheckCircle2, MapPin, Ruler, User, Loader2, Save, Package, Plus, FileText, Upload, Download, Trash2, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 export default function InstallationDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +28,9 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
   // Edit States
   const [stage, setStage] = useState("");
   const [status, setStatus] = useState("");
+  const [isEditIdOpen, setIsEditIdOpen] = useState(false);
+  const [editProjectId, setEditProjectId] = useState("");
+  const [savingId, setSavingId] = useState(false);
 
   // Material States
   const [materials, setMaterials] = useState<any[]>([]);
@@ -109,6 +113,43 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
         .order('date', { ascending: false });
       
       if (!error) setExpenses(data || []);
+  };
+
+  const handleSaveProjectId = async () => {
+      if (!editProjectId) {
+          toast.error("Project ID cannot be empty");
+          return;
+      }
+      
+      setSavingId(true);
+      
+      // Check uniqueness
+      const { data: existing } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('project_id', editProjectId)
+          .neq('id', id)
+          .single();
+          
+      if (existing) {
+          toast.error("Project ID already exists! Please use a unique ID.");
+          setSavingId(false);
+          return;
+      }
+      
+      const { error } = await supabase
+          .from('projects')
+          .update({ project_id: editProjectId })
+          .eq('id', id);
+          
+      if (error) {
+          toast.error("Error updating Project ID: " + error.message);
+      } else {
+          toast.success("Project ID updated successfully!");
+          setProject((prev: any) => ({ ...prev, project_id: editProjectId }));
+          setIsEditIdOpen(false);
+      }
+      setSavingId(false);
   };
 
   // UPDATE PROJECT STATUS
@@ -375,7 +416,16 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                     {project.status}
                 </Badge>
             </h1>
-            <p className="text-slate-500">Project ID: #{project.id} • {project.location}</p>
+            <div className="text-slate-500 flex items-center gap-2">
+                Project ID: {project.project_id || `#${project.id}`}
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-slate-400 hover:text-slate-700" onClick={() => {
+                    setEditProjectId(project.project_id || "");
+                    setIsEditIdOpen(true);
+                }}>
+                    <Pencil className="w-3 h-3" />
+                </Button>
+                • {project.location}
+            </div>
         </div>
         
         <div className="flex gap-2">
@@ -820,6 +870,30 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
         </TabsContent>
 
       </Tabs>
+
+      {/* Edit Project ID Dialog */}
+      <Dialog open={isEditIdOpen} onOpenChange={setIsEditIdOpen}>
+         <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Edit Project ID</DialogTitle></DialogHeader>
+            <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Project ID</label>
+                    <Input 
+                        placeholder="e.g. PRJ-2024-001" 
+                        value={editProjectId} 
+                        onChange={(e) => setEditProjectId(e.target.value)} 
+                    />
+                </div>
+            </div>
+            <DialogFooter>
+                 <Button variant="outline" onClick={() => setIsEditIdOpen(false)}>Cancel</Button>
+                 <Button onClick={handleSaveProjectId} className="bg-[#65A30D] hover:bg-[#558b0b]" disabled={savingId}>
+                     {savingId ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                     Save ID
+                 </Button>
+            </DialogFooter>
+         </DialogContent>
+      </Dialog>
     </div>
   );
 }

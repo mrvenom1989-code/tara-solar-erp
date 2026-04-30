@@ -26,6 +26,7 @@ export default function InstallationsListPage() {
   // For Add Modal
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newProject, setNewProject] = useState({
+      project_id: "",
       client_name: "",
       location: "",
       capacity: "3",
@@ -97,7 +98,25 @@ export default function InstallationsListPage() {
   };
 
   const handleAddProject = async () => {
+    if (!newProject.project_id) {
+        alert("Project ID is required");
+        return;
+    }
+
+    // Check uniqueness
+    const { data: existing } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('project_id', newProject.project_id)
+        .single();
+    
+    if (existing) {
+        alert("Project ID already exists! Please use a unique ID.");
+        return;
+    }
+
     const payload = {
+        project_id: newProject.project_id,
         client_name: newProject.client_name,
         location: newProject.location,
         capacity: Number(newProject.capacity),
@@ -111,7 +130,7 @@ export default function InstallationsListPage() {
 
     if (!error) {
         setIsAddOpen(false);
-        setNewProject({ client_name: "", location: "", capacity: "3", type: "Residential" });
+        setNewProject({ project_id: "", client_name: "", location: "", capacity: "3", type: "Residential" });
         fetchProjects(); // Refresh 
     } else {
         alert("Error adding installation: " + error.message);
@@ -121,7 +140,8 @@ export default function InstallationsListPage() {
   // Filter Logic
   const filteredProjects = projects.filter(p => {
     const matchesSearch = (p.client_name?.toLowerCase() || "").includes(filter.toLowerCase()) || 
-                          (p.location?.toLowerCase() || "").includes(filter.toLowerCase());
+                          (p.location?.toLowerCase() || "").includes(filter.toLowerCase()) ||
+                          (p.project_id?.toLowerCase() || "").includes(filter.toLowerCase());
     
     const isActive = p.status !== "Completed";
     
@@ -181,7 +201,7 @@ export default function InstallationsListPage() {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Client & Location</TableHead>
+                        <TableHead>Project ID & Client</TableHead>
                         <TableHead>System</TableHead>
                         <TableHead>Stage</TableHead>
                         <TableHead>Progress</TableHead>
@@ -192,7 +212,10 @@ export default function InstallationsListPage() {
                    {filteredProjects.map((project) => (
                        <TableRow key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                            <TableCell>
-                               <div className="font-bold text-slate-900 dark:text-white">{project.client_name}</div>
+                               <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                  {project.client_name}
+                                  {project.project_id && <Badge variant="secondary" className="text-[10px] h-5">{project.project_id}</Badge>}
+                               </div>
                                <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
                                    <MapPin className="w-3 h-3" /> {project.location || 'N/A'}
                                </div>
@@ -280,6 +303,10 @@ export default function InstallationsListPage() {
          <DialogContent className="sm:max-w-125">
             <DialogHeader><DialogTitle>Add New Installation</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">Project ID</Label>
+                    <Input placeholder="e.g. PRJ-2024-001" value={newProject.project_id} onChange={(e) => setNewProject({...newProject, project_id: e.target.value})} className="col-span-3" />
+                </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Client Name</Label>
                     <Input value={newProject.client_name} onChange={(e) => setNewProject({...newProject, client_name: e.target.value})} className="col-span-3" />
