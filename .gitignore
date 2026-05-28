@@ -47,3 +47,4 @@ next-env.d.ts
 *checkpoint.json
 *report.json
 gdrive-oauth-token.json
+session_handoff.md
