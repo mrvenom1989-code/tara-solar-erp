@@ -279,7 +279,7 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       setAddingMat(false);
   };
 
-  // UPLOAD DOCUMENTS (supports multiple files)
+  // UPLOAD DOCUMENTS (supports multiple files) — uses ImageKit via server-side API
   const handleUploadDocument = async () => {
       if (selectedFiles.length === 0) {
           toast.error("Please select at least one file to upload.");
@@ -291,46 +291,45 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       let failCount = 0;
 
       for (const file of selectedFiles) {
-          // Clean filename to prevent URL issues
-          const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const fileName = Date.now() + "_" + cleanName;
-          const filePath = id + "/" + fileName;
+          try {
+              // 1. Build FormData and POST to server-side API route
+              const formData = new FormData();
+              formData.append("file", file);
+              formData.append("folder", id);
 
-          // 1. Upload to Supabase Storage
-          const { error: uploadError } = await supabase
-              .storage
-              .from('project-files')
-              .upload(filePath, file);
+              const res = await fetch("/api/documents/upload", {
+                  method: "POST",
+                  body: formData,
+              });
 
-          if (uploadError) {
+              const result = await res.json();
+
+              if (!res.ok) {
+                  throw new Error(result.error || "Upload failed");
+              }
+
+              // 2. Save record to Supabase DB (store fileId for future deletes)
+              const { error: dbError } = await supabase.from('project_documents').insert({
+                  project_id: id,
+                  name: file.name,
+                  type: docType,
+                  url: result.url,
+                  storage_path: result.fileId, // reuse storage_path column for fileId
+              });
+
+              if (dbError) {
+                  failCount++;
+                  console.error("DB error for", file.name, dbError.message);
+              } else {
+                  successCount++;
+              }
+          } catch (uploadError: any) {
               failCount++;
               console.error("Upload error for", file.name, uploadError.message);
-              continue;
-          }
-
-          // 2. Get Public URL
-          const { data: { publicUrl } } = supabase
-              .storage
-              .from('project-files')
-              .getPublicUrl(filePath);
-
-          // 3. Save Record to Database
-          const { error: dbError } = await supabase.from('project_documents').insert({
-              project_id: id,
-              name: file.name,
-              type: docType,
-              url: publicUrl
-          });
-
-          if (dbError) {
-              failCount++;
-              console.error("DB error for", file.name, dbError.message);
-          } else {
-              successCount++;
           }
       }
 
-      // 4. Refresh & reset
+      // 3. Refresh & reset
       fetchDocuments();
       setSelectedFiles([]);
       const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -347,21 +346,29 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       setUploading(false);
   };
 
-  // DELETE DOCUMENT (Storage + DB)
+  // DELETE DOCUMENT (ImageKit + DB)
   const handleDeleteDocument = async (doc: any) => {
       if(!confirm("Are you sure you want to delete \"" + doc.name + "\"?")) return;
 
-      // 1. Try delete from Storage (Parse path from URL)
+      // 1. Try delete from ImageKit using stored fileId (in storage_path column)
       try {
-          // Extracts path after 'project-files/'
-          // URL format: .../storage/v1/object/public/project-files/[project_id]/[filename]
-          const path = doc.url.split('/project-files/')[1];
-          if(path) {
-              await supabase.storage.from('project-files').remove([path]);
+          if (doc.storage_path) {
+              // New documents: delete via ImageKit fileId
+              const res = await fetch("/api/documents/delete", {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ fileId: doc.storage_path }),
+              });
+              if (!res.ok) {
+                  const err = await res.json();
+                  console.error("ImageKit delete warning:", err.error);
+              }
+          } else {
+              // Legacy documents (old Supabase-hosted): skip storage delete, just clean DB
+              console.warn("No fileId found — skipping storage delete for legacy doc:", doc.name);
           }
-      } catch (e) {
-          console.error("Storage delete warning:", e);
-          // Continue to delete from DB even if storage fails
+      } catch (e: any) {
+          console.error("Storage delete warning:", e.message);
       }
 
       // 2. Delete from Database
@@ -370,7 +377,6 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
       if (error) {
           alert("Error removing document: " + error.message);
       } else {
-          // Remove from local state immediately
           setDocuments(documents.filter(d => d.id !== doc.id));
       }
   };
@@ -747,7 +753,13 @@ export default function InstallationDetailPage({ params }: { params: Promise<{ i
                                             {new Date(doc.created_at || doc.date).toLocaleDateString()}
                                         </TableCell>
                                         <TableCell className="text-right flex items-center justify-end gap-2">
-                                            <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                                            <a
+                                                href={doc.storage_path
+                                                    ? `/api/documents/download?fileId=${doc.storage_path}`
+                                                    : doc.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
                                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                                     <Download className="w-4 h-4 text-blue-600"/>
                                                 </Button>

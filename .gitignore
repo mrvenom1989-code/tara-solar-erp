@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local backups, reports, and OAuth credentials
+/DB Backup/
+*.csv
+*.sql
+*checkpoint.json
+*report.json
+gdrive-oauth-token.json
