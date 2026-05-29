@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const meta = await drive.files.get({
       fileId,
       fields: "name, mimeType, size",
+      supportsAllDrives: true,
     });
 
     const fileName = meta.data.name || "download";
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Download file content as stream
     const response = await drive.files.get(
-      { fileId, alt: "media" },
+      { fileId, alt: "media", supportsAllDrives: true },
       { responseType: "arraybuffer" }
     );
 

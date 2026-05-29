@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
         body: bufferToStream(buffer),
       },
       fields: "id, name, webViewLink",
+      // Required for Shared Drives; harmless for personal Drive
+      supportsAllDrives: true,
     });
 
     const fileId = driveResponse.data.id!;

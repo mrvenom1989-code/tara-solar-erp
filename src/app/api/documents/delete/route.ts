@@ -16,7 +16,7 @@ export async function DELETE(request: NextRequest) {
 
     const drive = getDriveClient();
 
-    await drive.files.delete({ fileId });
+    await drive.files.delete({ fileId, supportsAllDrives: true });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
