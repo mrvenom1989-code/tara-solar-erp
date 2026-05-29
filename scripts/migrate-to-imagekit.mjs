@@ -9,18 +9,48 @@
 // Usage:
 //   node scripts/migrate-to-imagekit.mjs              # run migration
 //   node scripts/migrate-to-imagekit.mjs --dry-run    # preview only
+//
+// Requires env vars (loaded from .env.local automatically):
+//   NEXT_PUBLIC_SUPABASE_URL
+//   SUPABASE_SERVICE_ROLE_KEY
+//   IMAGEKIT_PRIVATE_KEY
 // ─────────────────────────────────────────────────────────────────────
 
 import { createClient } from "@supabase/supabase-js";
 import ImageKit from "@imagekit/nodejs";
 import { Blob } from "buffer";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ── Load .env.local (if dotenv is available) ────────────────────────
+try {
+  const { config } = await import("dotenv");
+  config({ path: path.join(__dirname, "..", ".env.local") });
+} catch {
+  // dotenv not installed — env vars must be set in the shell
+}
 
 // ── Configuration ────────────────────────────────────────────────────
-const SUPABASE_URL = "https://lcycqyvlwtikbycbxwul.supabase.co";
-const SUPABASE_SERVICE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjeWNxeXZsd3Rpa2J5Y2J4d3VsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODc0Mzk0NCwiZXhwIjoyMDg0MzE5OTQ0fQ.zOSV_wFfUE2Vfc1AaRvk6wX2YUHAsW2zrucOVBFEMks";
-const IMAGEKIT_PRIVATE_KEY = "private_hLMMnKilr6vY3lUOpzHwf31FF5M=";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const IMAGEKIT_PRIVATE_KEY = process.env.IMAGEKIT_PRIVATE_KEY;
+
+const missingVars = [
+  !SUPABASE_URL && "NEXT_PUBLIC_SUPABASE_URL",
+  !SUPABASE_SERVICE_KEY && "SUPABASE_SERVICE_ROLE_KEY",
+  !IMAGEKIT_PRIVATE_KEY && "IMAGEKIT_PRIVATE_KEY",
+].filter(Boolean);
+
+if (missingVars.length > 0) {
+  console.error(
+    "❌ Missing required environment variables:\n" +
+    missingVars.map((v) => `   ${v}`).join("\n") + "\n" +
+    "   Set them in .env.local or export them in your shell before running this script."
+  );
+  process.exit(1);
+}
 
 // Pattern to detect old Supabase storage URLs
 const SUPABASE_STORAGE_PATTERN = "supabase.co/storage";

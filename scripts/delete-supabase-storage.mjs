@@ -5,6 +5,10 @@
 //
 // Reads from the CSV backup, extracts S3 relative paths, and deletes
 // files from the 'project-files' bucket in batches using the service role key.
+//
+// Requires env vars (loaded from .env.local automatically):
+//   NEXT_PUBLIC_SUPABASE_URL
+//   SUPABASE_SERVICE_ROLE_KEY
 // ─────────────────────────────────────────────────────────────────────
 
 import { createClient } from "@supabase/supabase-js";
@@ -14,9 +18,28 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const SUPABASE_URL = "https://lcycqyvlwtikbycbxwul.supabase.co";
-const SUPABASE_SERVICE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjeWNxeXZsd3Rpa2J5Y2J4d3VsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODc0Mzk0NCwiZXhwIjoyMDg0MzE5OTQ0fQ.zOSV_wFfUE2Vfc1AaRvk6wX2YUHAsW2zrucOVBFEMks";
+// ── Load .env.local (if dotenv is available) ─────────────────────────
+try {
+  const { config } = await import("dotenv");
+  config({ path: path.join(__dirname, "..", ".env.local") });
+} catch {
+  // dotenv not installed — env vars must be set in the shell
+}
+
+// ── Read credentials from environment ────────────────────────────────
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error(
+    "❌ Missing required environment variables:\n" +
+    "   NEXT_PUBLIC_SUPABASE_URL\n" +
+    "   SUPABASE_SERVICE_ROLE_KEY\n" +
+    "   Set them in .env.local or export them in your shell before running this script."
+  );
+  process.exit(1);
+}
+
 const CSV_PATH = path.join(__dirname, "..", "public", "project_documents_rows.csv");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
