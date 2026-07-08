@@ -27,6 +27,7 @@ function QuoteContent() {
   const isEditMode = searchParams.get("edit") === "true";
   
   const [currentDate, setCurrentDate] = useState("");
+  const [quoteId, setQuoteId] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -65,51 +66,65 @@ function QuoteContent() {
     // Only update if data is loaded
     if (loading) return;
 
-    setBomRows(prevRows => {
-      const newRows = [...prevRows];
+    const wattageMatch = data.panelSpec.match(/(\d+)/);
+    const wattage = wattageMatch ? parseInt(wattageMatch[0]) : 540;
+    const panelQty = Math.ceil((parseFloat(data.capacity || "0") * 1000) / wattage);
 
-      // Update Panel Row (SN 1)
-      newRows[0].make = `${data.panelMake} (${data.panelSpec})`;
-      // Auto-calculate Qty: Capacity (kW) * 1000 / Panel Wattage (Estimate 540W if not specified)
-      // We parse the first number found in spec as wattage, fallback to 540
-      const wattageMatch = data.panelSpec.match(/(\d+)/);
-      const wattage = wattageMatch ? parseInt(wattageMatch[0]) : 540;
-      const panelQty = Math.ceil((parseFloat(data.capacity || "0") * 1000) / wattage);
-      newRows[0].qty = `${panelQty} Nos`;
+    Promise.resolve().then(() => {
+      setBomRows(prevRows => {
+        const newRows = [...prevRows];
 
-      // Update Inverter Row (SN 2)
-      newRows[1].make = `${data.inverterMake} ${data.inverterSpec}`;
+        // Update Panel Row (SN 1)
+        newRows[0].make = `${data.panelMake} (${data.panelSpec})`;
+        newRows[0].qty = `${panelQty} Nos`;
 
-      return newRows;
+        // Update Inverter Row (SN 2)
+        newRows[1].make = `${data.inverterMake} ${data.inverterSpec}`;
+
+        return newRows;
+      });
     });
   }, [data.panelMake, data.panelSpec, data.inverterMake, data.inverterSpec, data.capacity, loading]);
 
 
   // 4. LOAD DATA
   useEffect(() => {
-    setCurrentDate(new Date().toLocaleDateString("en-IN"));
+    Promise.resolve().then(() => {
+      setCurrentDate(new Date().toLocaleDateString("en-IN"));
+    });
     
     const loadData = async () => {
-        const quoteId = searchParams.get("id");
+        const quoteRecordId = searchParams.get("id");
         const clientParam = searchParams.get("client");
         
-        if (quoteId) {
+        if (quoteRecordId) {
             const { data: quote, error } = await supabase
                 .from('quotations')
                 .select('*')
-                .eq('id', quoteId)
+                .eq('id', quoteRecordId)
                 .single();
             
             if (quote && quote.data_snapshot) {
                 setData(quote.data_snapshot);
                 // If the snapshot has saved BoM rows, load them too (Future proofing)
-                if(quote.data_snapshot.bomRows) {
+                if (quote.data_snapshot.bomRows) {
                     setBomRows(quote.data_snapshot.bomRows);
+                }
+                // Restore existing Quote ID or generate one
+                if (quote.data_snapshot.quoteId) {
+                    setQuoteId(quote.data_snapshot.quoteId);
+                } else {
+                    setQuoteId(`TS/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`);
                 }
             } else if (error) {
                 console.error("Error loading quote:", error);
             }
-        } else if (clientParam) {
+        } else {
+            // Generate stable random Quote ID for new quote
+            setQuoteId(`TS/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`);
+        }
+        
+        if (clientParam) {
             const capacityParam = searchParams.get("capacity") || "3";
             const addressParam = searchParams.get("address") || "";
             const phoneParam = searchParams.get("phone") || "";
@@ -126,12 +141,12 @@ function QuoteContent() {
     };
 
     loadData();
-  }, [searchParams]);
+  }, [searchParams, supabase]);
 
   // 5. HELPER: Handle Table Edit
   const handleBomChange = (index: number, field: keyof BoMRow, value: string) => {
       const newRows = [...bomRows];
-      // @ts-ignore
+      // @ts-expect-error - field typing assignment workaround
       newRows[index][field] = value;
       setBomRows(newRows);
   };
@@ -160,7 +175,7 @@ function QuoteContent() {
         address: data.address,
         phone: data.phone,
         // We save BOTH the master config AND the specific table rows
-        data_snapshot: { ...data, bomRows } 
+        data_snapshot: { ...data, bomRows, quoteId } 
     });
 
     if (error) {
@@ -175,7 +190,7 @@ function QuoteContent() {
   // 8. UPDATE
   const handleUpdate = async () => {
     setSaving(true);
-    const quoteId = searchParams.get("id");
+    const quoteRecordId = searchParams.get("id");
 
     const { error } = await supabase
         .from('quotations')
@@ -187,9 +202,9 @@ function QuoteContent() {
             capacity: data.capacity,
             address: data.address,
             phone: data.phone,
-            data_snapshot: { ...data, bomRows }
+            data_snapshot: { ...data, bomRows, quoteId }
         })
-        .eq('id', quoteId);
+        .eq('id', quoteRecordId);
 
     if (error) {
         alert("Error updating: " + error.message);
@@ -357,7 +372,7 @@ function QuoteContent() {
                 </div>
                 <div className="text-right text-sm">
                     <p><strong>Date:</strong> {currentDate}</p>
-                    <p><strong>Quote ID:</strong> TS/{new Date().getFullYear()}/{Math.floor(Math.random() * 10000)}</p>
+                    <p><strong>Quote ID:</strong> {quoteId}</p>
                 </div>
             </div>
 
@@ -483,9 +498,9 @@ function QuoteContent() {
                     <h4 className="font-bold text-slate-800 mb-3 border-b pb-1">Bank Details</h4>
                     <div className="space-y-1 text-sm text-slate-600">
                         <p><span className="font-semibold text-slate-900">Name:</span> TARA SOLAR ENERGY</p>
-                        <p><span className="font-semibold text-slate-900">Bank:</span> HDFC Bank</p>
-                        <p><span className="font-semibold text-slate-900">A/c No:</span> 50200106286546</p>
-                        <p><span className="font-semibold text-slate-900">IFSC:</span> HDFC0004055</p>
+                        <p><span className="font-semibold text-slate-900">Bank:</span> ICICI Bank</p>
+                        <p><span className="font-semibold text-slate-900">A/c No:</span> 530305500110</p>
+                        <p><span className="font-semibold text-slate-900">IFSC:</span> ICIC0005303</p>
                         <p><span className="font-semibold text-slate-900">Branch:</span> Satlasana</p>
                     </div>
                 </div>
