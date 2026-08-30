@@ -257,7 +257,7 @@ function QuoteContent() {
     const { error } = await supabase.from('quotations').insert({
         client_name: data.clientName,
         type: 'Industrial',
-        amount: `₹${formatCurrency(data.gstType === 'included' ? grandTotal : totalBaseAmount)}`,
+        amount: `₹${formatCurrency(grandTotal)}`,
         status: 'Generated',
         capacity: data.capacity,
         address: data.address, 
@@ -281,7 +281,7 @@ function QuoteContent() {
       .update({
         client_name: data.clientName,
         type: "Industrial",
-        amount: `₹${formatCurrency(data.gstType === 'included' ? grandTotal : totalBaseAmount)}`,
+        amount: `₹${formatCurrency(grandTotal)}`,
         status: "Updated",
         capacity: data.capacity,
         address: data.address,
@@ -648,6 +648,15 @@ function QuoteContent() {
                                     </td>
                                     <td className="p-4 text-right text-lg font-bold">
                                         ₹ {formatCurrency(gstInstallation)}
+                                    </td>
+                                </tr>
+                                <tr className="bg-amber-50/70 border-t">
+                                    <td className="p-4 text-right font-bold text-slate-900">
+                                        Total with GST
+                                        <span className="text-xs font-normal text-slate-600"> (GST Included)</span>
+                                    </td>
+                                    <td className="p-4 text-right text-2xl font-bold text-[#D97706]">
+                                        ₹ {formatCurrency(grandTotal)}
                                     </td>
                                 </tr>
                             </>
